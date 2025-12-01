@@ -803,13 +803,15 @@
             selectedImage.value = results.value[selectedIndex.value].image;
           };
 
-          const openPreview = (idx) => {
-            const index = typeof idx === "number" ? idx : selectedIndex.value;
-            const item = results.value[index] || results.value[0];
+          const openPreview = (idx = 0) => {
+            if (!results.value.length) return;
+            const index = Math.max(0, Math.min(results.value.length - 1, idx));
+            const item = results.value[index];
             if (!item) return;
-            selectedIndex.value = index >= 0 ? index : 0;
-            selectedImage.value = results.value[selectedIndex.value].image;
+            selectedIndex.value = index;
+            selectedImage.value = item.image;
             previewOpen.value = true;
+            console.log("preview open", index);
           };
 
           const closePreview = () => {

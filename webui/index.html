@@ -833,6 +833,8 @@
             for (let i = 0; i < count; i += 1) {
               batchCursor.value = i + 1;
               const nextSeed = seed.value === "" ? Math.floor(Math.random() * 1_000_000) : seed.value;
+              seed.value = nextSeed; // 显示当前循环使用的种子，也写入历史
+              console.log("batch generate", batchCursor.value, "/", count, "seed", nextSeed);
               const ok = await generate({ seed: nextSeed });
               if (!ok) break;
             }

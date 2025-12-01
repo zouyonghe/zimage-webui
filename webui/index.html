@@ -566,7 +566,7 @@
       <section class="card">
         <h2>生成结果</h2>
         <div v-if="results.length" class="image-grid">
-          <div class="thumb" v-for="(item, idx) in results" :key="item.meta.seed + '-' + idx" @click="openPreview(item, idx)">
+          <div class="thumb" v-for="(item, idx) in results" :key="item.meta.seed + '-' + idx" @click="openPreview(idx)">
             <img :src="item.image" :alt="`生成结果 ${idx + 1}`" />
             <div class="tag">{{ item.meta.width }}×{{ item.meta.height }}</div>
           </div>
@@ -808,7 +808,7 @@
             const item = results.value[index] || results.value[0];
             if (!item) return;
             selectedIndex.value = index >= 0 ? index : 0;
-            selectedImage.value = item.image;
+            selectedImage.value = results.value[selectedIndex.value].image;
             previewOpen.value = true;
           };
 

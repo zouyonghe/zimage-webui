@@ -22,7 +22,7 @@
 pip install -r requirements.txt
 
 # 下载模型权重（需先安装 aria2c；默认使用国内镜像）
-cd scripts && bash download.sh && cd ..
+cd scripts && bash download_models.sh && cd ..
 ```
 
 ## 运行
@@ -41,7 +41,8 @@ python webui_server.py
 - `zimage-model/`：模型权重（默认从本地加载）
 - `outputs/`：生成结果自动保存目录（运行后自动创建）
 - 其他：`requirements.txt`、测试脚本等
-- 模型下载脚本：`scripts/download.sh`（默认使用 hf-mirror 镜像）
+- 模型下载脚本：`scripts/download_models.sh`（默认使用 hf-mirror 镜像）
+- CUDA 测试脚本：`scripts/test_cuda.py`
 
 ## 其他
 - 如果需要调整分辨率范围，前后端都有最小 512 / 最大 1024、步长 16 的限制；同步修改 `webui/index.html` 与 `webui_server.py` 中的参数即可。

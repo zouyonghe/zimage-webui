@@ -655,7 +655,7 @@
           const selectedIndex = ref(0);
           const previewOpen = ref(false);
           const history = ref([]);
-          const selectedRatio = ref("1:1");
+          const selectedRatio = ref("1:1 512");
           const ratios = [
             { label: "1:1 512", width: 512, height: 512 },
             { label: "1:1 768", width: 768, height: 768 },
@@ -754,6 +754,7 @@
             if (pick) {
               prompt.value = pick;
             }
+            selectedRatio.value = ratios[0]?.label || selectedRatio.value;
             onRatioChange();
           });
 

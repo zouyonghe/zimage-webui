@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+*.tmp
+*.swp
+*.bak
+.DS_Store
+
+# Environments
+.env
+venv/
+.venv/
+
+# Generated outputs
+outputs/
+zimage_test.png
+
+# Large model/weight directories
+zimage-model/
+weights/
+text_encoder/
+transformer/
+vae/
+
+# Misc
+.idea/
+.vscode/

@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Z-Image WebUI</title>
+    <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/246097416?s=48&v=4" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0f172a;
+        --panel: rgba(255, 255, 255, 0.06);
+        --panel-strong: rgba(255, 255, 255, 0.12);
+        --accent: #7c3aed;
+        --accent-2: #22d3ee;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --success: #4ade80;
+        --danger: #f87171;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Space Grotesk", "Inter", system-ui, -apple-system, sans-serif;
+        color: var(--text);
+        background: radial-gradient(circle at 20% 20%, #1e293b, #0f172a 40%),
+          radial-gradient(circle at 80% 30%, #1d1b2f, #0f172a 45%),
+          #0f172a;
+        padding: 32px;
+      }
+
+      .layout {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 20px;
+      }
+
+      header {
+        max-width: 1200px;
+        margin: 0 auto 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .logo {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        border: 1px solid var(--panel-strong);
+        object-fit: cover;
+        background: var(--panel);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 26px;
+        letter-spacing: 0.5px;
+      }
+
+      .badge {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #0b1020;
+        padding: 8px 12px;
+        border-radius: 12px;
+        font-weight: 600;
+        box-shadow: 0 10px 40px rgba(124, 58, 237, 0.3);
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--panel-strong);
+        border-radius: 16px;
+        padding: 18px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+      }
+
+      .card h2 {
+        margin: 0 0 12px;
+        font-size: 18px;
+        letter-spacing: 0.2px;
+      }
+
+      label {
+        display: block;
+        margin: 12px 0 4px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      input,
+      textarea,
+      select {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--panel-strong);
+        border-radius: 12px;
+        color: var(--text);
+        padding: 10px 12px;
+        font-size: 14px;
+        transition: border-color 0.15s ease, transform 0.15s ease;
+        outline: none;
+      }
+
+      input:focus,
+      textarea:focus,
+      select:focus {
+        border-color: var(--accent);
+        transform: translateY(-1px);
+      }
+
+      textarea {
+        min-height: 110px;
+        resize: vertical;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+      }
+
+      button {
+        border: none;
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: transform 0.1s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+        color: #0c1024;
+      }
+
+      button.primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        box-shadow: 0 10px 30px rgba(124, 58, 237, 0.35);
+        color: #0c1024;
+      }
+
+      button.secondary {
+        background: var(--panel-strong);
+        color: var(--text);
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+
+      button:not(:disabled):hover {
+        transform: translateY(-1px);
+      }
+
+      .status {
+        margin-top: 10px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      .status.error {
+        color: var(--danger);
+      }
+
+      .status.success {
+        color: var(--success);
+      }
+
+      .image-frame {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        border-radius: 16px;
+        border: 1px solid var(--panel-strong);
+        background: rgba(255, 255, 255, 0.02);
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .image-frame.is-clickable {
+        cursor: zoom-in;
+      }
+
+      .image-frame img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .placeholder {
+        color: var(--muted);
+        font-size: 14px;
+        text-align: center;
+      }
+
+      .loader {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        border: 4px solid rgba(255, 255, 255, 0.08);
+        border-top-color: var(--accent);
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .meta {
+        margin-top: 12px;
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--panel-strong);
+        font-size: 12px;
+      }
+
+      .preset-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .chip {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--panel-strong);
+        color: var(--text);
+        padding: 8px 10px;
+        border-radius: 10px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: transform 0.1s ease, border-color 0.15s ease;
+      }
+
+      .chip:hover {
+        transform: translateY(-1px);
+        border-color: var(--accent);
+      }
+
+      .history-list {
+        display: grid;
+        gap: 10px;
+        max-height: 520px;
+        overflow: auto;
+      }
+
+      .history-item {
+        display: grid;
+        grid-template-columns: 88px 1fr;
+        gap: 10px;
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid var(--panel-strong);
+        background: rgba(255, 255, 255, 0.04);
+        align-items: center;
+      }
+
+      .history-thumb {
+        width: 88px;
+        height: 88px;
+        border-radius: 10px;
+        object-fit: cover;
+        border: 1px solid var(--panel-strong);
+      }
+
+      .history-meta {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+
+      .history-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+        flex-wrap: wrap;
+      }
+
+      .corner-status {
+        position: fixed;
+        left: 18px;
+        bottom: 18px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: var(--panel);
+        border: 1px solid var(--panel-strong);
+        backdrop-filter: blur(10px);
+        color: var(--text);
+        font-size: 14px;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--accent);
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+          opacity: 0.8;
+        }
+        50% {
+          transform: scale(1.3);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 0.8;
+        }
+      }
+
+      .preview-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: grid;
+        place-items: center;
+        padding: 20px;
+        z-index: 20;
+        backdrop-filter: blur(4px);
+      }
+
+      .preview-body {
+        background: var(--panel);
+        border: 1px solid var(--panel-strong);
+        border-radius: 16px;
+        padding: 16px;
+        max-width: 90vw;
+        max-height: 90vh;
+        display: grid;
+        gap: 12px;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+      }
+
+      .preview-body img {
+        max-width: 78vw;
+        max-height: 70vh;
+        border-radius: 12px;
+        object-fit: contain;
+      }
+
+      .preview-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+
+      @media (max-width: 720px) {
+        body {
+          padding: 18px;
+        }
+        header {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .image-frame {
+          aspect-ratio: 1 / 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <img class="logo" src="https://avatars.githubusercontent.com/u/246097416?s=48&v=4" alt="Z-Image Logo" />
+        <h1>Z-Image WebUI</h1>
+        <div style="color: var(--muted); margin-top: 4px">
+          输入提示词，在线生成高质量图片
+        </div>
+      </div>
+    </header>
+
+    <main class="layout" id="app">
+      <section class="card">
+        <h2>提示词与参数</h2>
+        <label for="prompt">提示词</label>
+        <textarea
+          id="prompt"
+          v-model="prompt"
+          placeholder="描述你想生成的画面..."
+        ></textarea>
+
+        <label for="negative">负面提示词</label>
+        <textarea
+          id="negative"
+          v-model="negativePrompt"
+          placeholder="不想出现的元素，例如：low quality, blurry, watermark"
+        ></textarea>
+
+        <div class="row">
+          <div>
+            <label for="steps">采样步数 {{ steps }}</label>
+            <input
+              type="range"
+              id="steps"
+              v-model.number="steps"
+              min="4"
+              max="30"
+              step="1"
+              title="控制推理步数，步数越多越精细但耗时更长"
+            />
+          </div>
+          <div>
+            <label for="guidance">引导强度 {{ guidance.toFixed(1) }}</label>
+            <input
+              type="range"
+              id="guidance"
+              v-model.number="guidance"
+              min="0"
+              max="10"
+              step="0.5"
+              title="提示词引导强度，数值越高越贴合提示词，但过高可能产生伪影"
+            />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="height">高度 (px)</label>
+            <input
+              type="number"
+              id="height"
+              v-model.number="height"
+              min="512"
+              max="1024"
+              step="64"
+              title="输出图片高度，分辨率越大越耗时与显存"
+              @change="snapDimensions"
+            />
+          </div>
+          <div>
+            <label for="width">宽度 (px)</label>
+            <input
+              type="number"
+              id="width"
+              v-model.number="width"
+              min="512"
+              max="1024"
+              step="64"
+              title="输出图片宽度，分辨率越大越耗时与显存"
+              @change="snapDimensions"
+            />
+          </div>
+          <div>
+            <label for="seed">随机种子 (可选)</label>
+            <input
+              type="number"
+              id="seed"
+              v-model="seed"
+              placeholder="留空则随机"
+              title="固定种子以复现同一结果；留空自动随机"
+            />
+          </div>
+          <div>
+            <label for="batchCount">连续生成张数</label>
+            <input
+              type="number"
+              id="batchCount"
+              v-model.number="batchCount"
+              min="1"
+              max="10"
+              step="1"
+              title="一次点击连续生成多张图片，最多 10 张"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label>画幅预设</label>
+          <select v-model="selectedRatio" @change="onRatioChange">
+            <option v-for="ratio in ratios" :key="ratio.label" :value="ratio.label">
+              {{ ratio.label }} ({{ ratio.width }}×{{ ratio.height }})
+            </option>
+          </select>
+        </div>
+
+        <div class="actions">
+        <button class="primary" :disabled="isGenerateDisabled" @click="generate()">
+          {{ loading ? "正在生成..." : "生成图片" }}
+        </button>
+        <button class="secondary" :disabled="batchRunning || isGenerateDisabled" @click="generateBatch">
+          {{ batchRunning ? `连续生成 ${batchCursor}/${batchTotal}` : `连续生成${batchCount > 1 ? `（${batchCount}张）` : ""}` }}
+        </button>
+          <button class="secondary" :disabled="loading || batchRunning" @click="randomizeSeed">随机种子</button>
+          <button class="secondary" :disabled="loading || batchRunning" @click="resetPrompt">重置默认</button>
+          <button class="secondary" :disabled="!image || loading || batchRunning" @click="downloadImage">保存图片</button>
+        </div>
+
+        <div class="status" :class="{'error': error || modelError, 'success': successMsg}">
+          <span v-if="error">⚠ {{ error }}</span>
+          <span v-else-if="successMsg">✅ {{ successMsg }}</span>
+          <span v-else>{{ statusLabel }}</span>
+        </div>
+
+        <div class="meta" v-if="meta">
+          <div class="pill">设备: {{ meta.device }}</div>
+          <div class="pill">步数: {{ meta.steps }}</div>
+          <div class="pill">引导: {{ meta.guidance }}</div>
+          <div class="pill">尺寸: {{ meta.width }} × {{ meta.height }}</div>
+          <div class="pill" v-if="meta.negative_prompt">负面: {{ meta.negative_prompt }}</div>
+          <div class="pill" v-if="meta.seed !== null">种子: {{ meta.seed }}</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>生成结果</h2>
+        <div class="image-frame" :class="{'is-clickable': image}" @click="openPreview">
+          <div v-if="loading" class="loader"></div>
+          <img v-else-if="image" :src="image" alt="生成结果" />
+          <div v-else class="placeholder">
+            暂无图片，输入提示词后点击“生成图片”
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>历史记录</h2>
+        <div v-if="history.length === 0" class="placeholder">暂无历史记录</div>
+        <div v-else class="history-list">
+          <div class="history-item" v-for="item in history" :key="item.id">
+            <img class="history-thumb" :src="item.image" alt="历史缩略图" />
+            <div>
+              <div class="history-meta">
+                {{ item.prompt }}
+                <div>步数: {{ item.steps }} | 引导: {{ item.guidance }} | 种子: {{ item.seed ?? "随机" }}</div>
+                <div>尺寸: {{ item.width }}×{{ item.height }}</div>
+                <div v-if="item.negative">负面: {{ item.negative }}</div>
+              </div>
+              <div class="history-actions">
+                <button class="secondary" @click="applyHistory(item)">回填</button>
+                <button class="secondary" @click="regenerate(item)">再次生成</button>
+                <button class="secondary" @click="deleteHistory(item.id)">删除</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <div class="corner-status">
+        <div class="dot" :style="{ background: statusTone }"></div>
+        <div>{{ statusLabel }}</div>
+      </div>
+
+      <div v-if="previewOpen" class="preview-overlay" @click.self="closePreview">
+        <div class="preview-body">
+          <img :src="image" alt="生成结果大图" />
+          <div class="preview-actions">
+            <button class="secondary" @click.stop="downloadImage">下载图片</button>
+            <button class="secondary" @click.stop="closePreview">关闭</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script type="module">
+      import { createApp, ref, computed, onMounted } from "https://unpkg.com/vue@3/dist/vue.esm-browser.js";
+
+      const DEFAULT_PROMPT = "a cat sitting on a chair, high quality, detailed";
+
+      createApp({
+        setup() {
+          const prompt = ref(DEFAULT_PROMPT);
+          const negativePrompt = ref("");
+          const steps = ref(9);
+          const guidance = ref(0);
+          const height = ref(512);
+          const width = ref(512);
+          const seed = ref("");
+          const batchCount = ref(1);
+          const batchRunning = ref(false);
+          const batchCursor = ref(0);
+          const batchTotal = ref(0);
+          const loading = ref(false);
+          const modelLoading = ref(true);
+          const modelError = ref("");
+          const error = ref("");
+          const meta = ref(null);
+          const image = ref("");
+          const previewOpen = ref(false);
+          const history = ref([]);
+          const selectedRatio = ref("1:1");
+          const ratios = [
+            { label: "1:1", width: 512, height: 512 },
+            { label: "1:1 (768)", width: 768, height: 768 },
+            { label: "3:4", width: 576, height: 768 },
+            { label: "4:3", width: 768, height: 576 },
+            { label: "16:9", width: 960, height: 544 },
+            { label: "9:16", width: 576, height: 1024 },
+            { label: "4:5", width: 640, height: 800 },
+            { label: "5:4", width: 800, height: 640 },
+            { label: "3:2", width: 768, height: 512 },
+            { label: "2:3", width: 512, height: 768 },
+            { label: "16:10", width: 896, height: 560 },
+            { label: "5:3", width: 864, height: 512 },
+            { label: "2:1", width: 1024, height: 512 },
+            { label: "1:2", width: 512, height: 1024 },
+            { label: "1:1 (1024)", width: 1024, height: 1024 },
+          ];
+
+          const presets = [
+            "a cinematic portrait of a cyberpunk samurai, neon lights, rain, ultra detailed, 8k",
+            "sunset over a futuristic city, flying cars, warm light, volumetric fog, anime style",
+            "an ancient library with floating books and soft candles, magical realism, high detail",
+            "a cozy cat cafe interior, soft focus, pastel colors, photography",
+            "a spaceship landing on a lush alien planet, epic scale, vibrant colors, concept art",
+          ];
+
+          const successMsg = computed(() => (image.value && !loading.value && !error.value ? "生成完成" : ""));
+          const statusLabel = computed(() => {
+            if (modelError.value) return `加载失败: ${modelError.value}`;
+            if (batchRunning.value) return `连续生成中 ${batchCursor.value}/${batchTotal.value}`;
+            if (loading.value) return "正在生成...";
+            if (modelLoading.value) return "模型加载中...";
+            return "已就绪";
+          });
+          const statusTone = computed(() => {
+            if (modelError.value) return "var(--danger)";
+            if (loading.value || modelLoading.value || batchRunning.value) return "var(--accent)";
+            return "var(--success)";
+          });
+          const isGenerateDisabled = computed(
+            () => loading.value || modelLoading.value || !!modelError.value || batchRunning.value
+          );
+
+          const resetPrompt = () => {
+            prompt.value = DEFAULT_PROMPT;
+            negativePrompt.value = "";
+            guidance.value = 0;
+            steps.value = 9;
+            height.value = 512;
+            width.value = 512;
+            seed.value = "";
+            batchCount.value = 1;
+          };
+
+          const randomizeSeed = () => {
+            seed.value = Math.floor(Math.random() * 1_000_000);
+          };
+
+          const applyRatio = (ratio) => {
+            width.value = ratio.width;
+            height.value = ratio.height;
+            snapDimensions();
+          };
+
+          const onRatioChange = () => {
+            const ratio = ratios.find((r) => r.label === selectedRatio.value);
+            if (ratio) applyRatio(ratio);
+          };
+
+          const sanitizeDimension = (v) => {
+            const num = Number(v);
+            if (!Number.isFinite(num) || num <= 0) return 512;
+            return Math.max(512, Math.min(1024, Math.floor(num / 16) * 16));
+          };
+
+          const snapDimensions = () => {
+            const snap = (v) => {
+              return sanitizeDimension(v);
+            };
+            width.value = snap(width.value);
+            height.value = snap(height.value);
+            return { width: width.value, height: height.value };
+          };
+
+          const sanitizeBatchCount = (v) => {
+            const num = Number(v);
+            if (!Number.isFinite(num) || num <= 0) return 1;
+            return Math.max(1, Math.min(10, Math.floor(num)));
+          };
+
+          onMounted(() => {
+            const pick = presets[Math.floor(Math.random() * presets.length)];
+            if (pick) {
+              prompt.value = pick;
+            }
+            onRatioChange();
+          });
+
+          const addToHistory = (payload) => {
+            const entry = {
+              id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+              image: payload.image,
+              prompt: payload.meta.prompt,
+              negative: payload.meta.negative_prompt,
+              steps: payload.meta.steps,
+              guidance: payload.meta.guidance,
+              width: payload.meta.width,
+              height: payload.meta.height,
+              seed: payload.meta.seed,
+            };
+            history.value = [entry, ...history.value].slice(0, 12);
+          };
+
+          const downloadImage = () => {
+            if (!image.value) return;
+            const link = document.createElement("a");
+            link.href = image.value;
+            link.download = "zimage.png";
+            link.click();
+          };
+
+          const openPreview = () => {
+            if (!image.value) return;
+            previewOpen.value = true;
+          };
+
+          const closePreview = () => {
+            previewOpen.value = false;
+          };
+
+          const generate = async (overrides = {}) => {
+            // 忽略按钮事件对象，保证不会把 PointerEvent.width/height=1 当成尺寸
+            if (overrides instanceof Event) {
+              overrides = {};
+            }
+            // 确保发送前尺寸已对齐、在有效范围内
+            const aligned = (() => {
+              const resolvedHeight = overrides.height ?? height.value;
+              const resolvedWidth = overrides.width ?? width.value;
+              const h = sanitizeDimension(resolvedHeight);
+              const w = sanitizeDimension(resolvedWidth);
+              height.value = h;
+              width.value = w;
+              return { height: h, width: w };
+            })();
+
+            if (modelLoading.value) {
+              error.value = "模型加载中，请稍后再试";
+              return false;
+            }
+            if (modelError.value) {
+              error.value = `模型加载失败: ${modelError.value}`;
+              return false;
+            }
+            error.value = "";
+            loading.value = true;
+            meta.value = null;
+
+            const payload = {
+              prompt: overrides.prompt ?? prompt.value,
+              negative_prompt: overrides.negative_prompt ?? negativePrompt.value,
+              steps: overrides.steps ?? steps.value,
+              guidance: overrides.guidance ?? guidance.value,
+              height: aligned.height,
+              width: aligned.width,
+            };
+
+            console.log("generate payload", payload);
+
+            const seedVal = overrides.seed ?? seed.value;
+            if (seedVal !== "") {
+              payload.seed = Number(seedVal);
+            }
+
+            try {
+              const res = await fetch("/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              });
+
+              const data = await res.json();
+              if (!res.ok) {
+                throw new Error(data.error || "生成失败");
+              }
+
+              image.value = data.image;
+              meta.value = data.meta || null;
+              addToHistory(data);
+              return true;
+            } catch (err) {
+              error.value = err.message || "生成失败";
+              return false;
+            } finally {
+              loading.value = false;
+            }
+          };
+
+          const generateBatch = async () => {
+            const count = sanitizeBatchCount(batchCount.value);
+            batchCount.value = count;
+            if (count <= 1) {
+              await generate();
+              return;
+            }
+            if (batchRunning.value) return;
+            batchRunning.value = true;
+            batchTotal.value = count;
+            batchCursor.value = 0;
+            error.value = "";
+
+            for (let i = 0; i < count; i += 1) {
+              batchCursor.value = i + 1;
+              const nextSeed = seed.value === "" ? Math.floor(Math.random() * 1_000_000) : seed.value;
+              const ok = await generate({ seed: nextSeed });
+              if (!ok) break;
+            }
+
+            batchRunning.value = false;
+            batchCursor.value = 0;
+            batchTotal.value = 0;
+          };
+
+          const applyHistory = (item) => {
+              prompt.value = item.prompt;
+              negativePrompt.value = item.negative || "";
+              steps.value = item.steps;
+              guidance.value = item.guidance;
+              width.value = item.width;
+              height.value = item.height;
+              seed.value = item.seed ?? "";
+              image.value = item.image;
+              meta.value = {
+                prompt: item.prompt,
+                negative_prompt: item.negative,
+                steps: item.steps,
+                guidance: item.guidance,
+                height: item.height,
+                width: item.width,
+                seed: item.seed,
+              };
+          };
+
+          const regenerate = (item) => {
+            applyHistory(item);
+            generate({
+              prompt: item.prompt,
+              negative_prompt: item.negative,
+              steps: item.steps,
+              guidance: item.guidance,
+              width: item.width,
+              height: item.height,
+              seed: item.seed ?? "",
+            });
+          };
+
+          const deleteHistory = (id) => {
+            history.value = history.value.filter((x) => x.id !== id);
+          };
+
+          const checkHealth = async () => {
+            try {
+              const res = await fetch("/health");
+              if (!res.ok) throw new Error();
+              const data = await res.json();
+              if (data.pipeline_error) {
+                modelError.value = data.pipeline_error;
+                modelLoading.value = false;
+                return;
+              }
+              if (data.pipeline_ready) {
+                modelLoading.value = false;
+                return;
+              }
+            } catch (err) {
+              // swallow errors; will retry
+            }
+            setTimeout(checkHealth, 1200);
+          };
+
+          checkHealth();
+
+          return {
+            prompt,
+            negativePrompt,
+            steps,
+            guidance,
+            height,
+            width,
+            seed,
+            loading,
+            modelLoading,
+            modelError,
+            statusLabel,
+            statusTone,
+            error,
+            meta,
+            image,
+            presets,
+            successMsg,
+            ratios,
+            selectedRatio,
+            history,
+            generate,
+            generateBatch,
+            randomizeSeed,
+            resetPrompt,
+            downloadImage,
+            previewOpen,
+            openPreview,
+            closePreview,
+            applyRatio,
+            onRatioChange,
+            snapDimensions,
+            batchCount,
+            batchRunning,
+            batchCursor,
+            batchTotal,
+            applyHistory,
+            regenerate,
+            deleteHistory,
+          };
+        },
+      }).mount("#app");
+    </script>
+  </body>
+</html>

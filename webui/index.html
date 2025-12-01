@@ -736,7 +736,13 @@
             if (!image.value) return;
             const link = document.createElement("a");
             link.href = image.value;
-            link.download = "zimage.png";
+            const saved = meta.value?.saved_path;
+            if (saved) {
+              link.download = saved.split(/[\\/]/).pop() || "zimage.png";
+            } else {
+              const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 15);
+              link.download = `zimage_${stamp}.png`;
+            }
             link.click();
           };
 

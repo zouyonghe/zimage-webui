@@ -857,8 +857,13 @@
 
             for (let i = 0; i < count; i += 1) {
               batchCursor.value = i + 1;
-              const nextSeed = seed.value === "" ? Math.floor(Math.random() * 1_000_000) : seed.value;
-              seed.value = nextSeed;
+              const nextSeed =
+                overrides.seed !== undefined
+                  ? overrides.seed
+                  : seed.value === ""
+                    ? Math.floor(Math.random() * 1_000_000)
+                    : seed.value;
+              seed.value = nextSeed; // 当前循环使用的种子
               const ok = await generateOnce({ ...overrides, seed: nextSeed });
               if (!ok) break;
             }

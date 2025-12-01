@@ -389,12 +389,24 @@
         max-height: 70vh;
         border-radius: 12px;
         object-fit: contain;
+        justify-self: center;
       }
 
       .preview-actions {
         display: flex;
-        justify-content: flex-end;
+        justify-content: space-between;
         gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .nav-buttons {
+        display: flex;
+        gap: 8px;
+      }
+
+      .nav-buttons button {
+        min-width: 80px;
       }
 
       @media (max-width: 720px) {
@@ -599,8 +611,14 @@
           <div class="preview-body">
           <img :src="selectedImage || results[0]?.image" alt="生成结果大图" />
           <div class="preview-actions">
-            <button class="secondary" @click.stop="downloadImage">下载图片</button>
-            <button class="secondary" @click.stop="closePreview">关闭</button>
+            <div class="nav-buttons">
+              <button class="secondary" @click.stop="prevImage" :disabled="!hasPrev">上一张</button>
+              <button class="secondary" @click.stop="nextImage" :disabled="!hasNext">下一张</button>
+            </div>
+            <div style="display:flex; gap:8px; margin-left:auto;">
+              <button class="secondary" @click.stop="downloadImage">下载图片</button>
+              <button class="secondary" @click.stop="closePreview">关闭</button>
+            </div>
           </div>
         </div>
       </div>
@@ -632,6 +650,7 @@
           const results = ref([]);
           const image = ref("");
           const selectedImage = ref("");
+          const selectedIndex = ref(0);
           const previewOpen = ref(false);
           const history = ref([]);
           const selectedRatio = ref("1:1");
@@ -687,6 +706,9 @@
             width.value = 512;
             seed.value = "";
             batchCount.value = 1;
+            results.value = [];
+            selectedImage.value = "";
+            selectedIndex.value = 0;
           };
 
           const randomizeSeed = () => {
@@ -749,8 +771,8 @@
           };
 
           const downloadImage = () => {
-            const target = selectedImage.value || results.value[0]?.image || "";
-            const targetMeta = results.value.find((r) => r.image === target)?.meta || meta.value;
+            const target = selectedImage.value || results.value[selectedIndex.value]?.image || "";
+            const targetMeta = results.value[selectedIndex.value]?.meta || results.value.find((r) => r.image === target)?.meta || meta.value;
             if (!target) return;
             const link = document.createElement("a");
             link.href = target;
@@ -764,10 +786,26 @@
             link.click();
           };
 
-          const openPreview = () => {
-            const target = selectedImage.value || results.value[0]?.image;
+          const hasPrev = computed(() => selectedIndex.value > 0);
+          const hasNext = computed(() => selectedIndex.value < results.value.length - 1);
+
+          const prevImage = () => {
+            if (!hasPrev.value) return;
+            selectedIndex.value -= 1;
+            selectedImage.value = results.value[selectedIndex.value].image;
+          };
+
+          const nextImage = () => {
+            if (!hasNext.value) return;
+            selectedIndex.value += 1;
+            selectedImage.value = results.value[selectedIndex.value].image;
+          };
+
+          const openPreview = (targetImage) => {
+            const target = targetImage || selectedImage.value || results.value[selectedIndex.value]?.image || results.value[0]?.image;
             if (!target) return;
             selectedImage.value = target;
+            selectedIndex.value = results.value.findIndex((r) => r.image === target);
             previewOpen.value = true;
           };
 

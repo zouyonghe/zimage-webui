@@ -565,8 +565,7 @@
 
       <section class="card">
         <h2>生成结果</h2>
-        <div v-if="loading" class="loader"></div>
-        <div v-else-if="results.length" class="image-grid">
+        <div v-if="results.length" class="image-grid">
           <div class="thumb" v-for="(item, idx) in results" :key="item.meta.seed + '-' + idx" @click="openPreview(item.image)">
             <img :src="item.image" :alt="`生成结果 ${idx + 1}`" />
             <div class="tag">{{ item.meta.width }}×{{ item.meta.height }}</div>
@@ -574,6 +573,9 @@
         </div>
         <div v-else class="placeholder">
           暂无图片，输入提示词后点击“生成图片”
+        </div>
+        <div v-if="loading" style="margin-top: 12px; display: flex; justify-content: center;">
+          <div class="loader"></div>
         </div>
       </section>
 

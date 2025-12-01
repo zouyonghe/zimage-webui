@@ -883,6 +883,9 @@
             const seedWasEmpty = seed.value === "";
             const fixedSeed = seedWasEmpty ? null : seed.value;
 
+            if (loading.value || batchRunning.value) {
+              return false;
+            }
             if (modelLoading.value) {
               error.value = "模型加载中，请稍后再试";
               return false;

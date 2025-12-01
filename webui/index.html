@@ -566,7 +566,10 @@
       </section>
 
       <section class="card">
-        <h2>历史记录</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h2>历史记录</h2>
+          <button class="secondary" :disabled="history.length === 0" @click="clearHistory">清空</button>
+        </div>
         <div v-if="history.length === 0" class="placeholder">暂无历史记录</div>
         <div v-else class="history-list">
           <div class="history-item" v-for="item in history" :key="item.id">
@@ -902,6 +905,10 @@
             history.value = history.value.filter((x) => x.id !== id);
           };
 
+          const clearHistory = () => {
+            history.value = [];
+          };
+
           const checkHealth = async () => {
             try {
               const res = await fetch("/health");
@@ -965,6 +972,7 @@
             applyHistory,
             regenerate,
             deleteHistory,
+            clearHistory,
           };
         },
       }).mount("#app");

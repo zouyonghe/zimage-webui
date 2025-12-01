@@ -566,7 +566,7 @@
       <section class="card">
         <h2>生成结果</h2>
         <div v-if="results.length" class="image-grid">
-          <div class="thumb" v-for="(item, idx) in results" :key="item.meta.seed + '-' + idx" @click="openPreview(idx)">
+          <div class="thumb" v-for="(item, idx) in results" :key="item.meta.seed + '-' + idx" @click="openPreview(item, idx)">
             <img :src="item.image" :alt="`生成结果 ${idx + 1}`" />
             <div class="tag">{{ item.meta.width }}×{{ item.meta.height }}</div>
           </div>
@@ -611,7 +611,7 @@
 
       <div v-if="previewOpen" class="preview-overlay" @click.self="closePreview">
           <div class="preview-body">
-          <img :src="selectedImage || results[0]?.image" alt="生成结果大图" />
+          <img :src="selectedImage || results[selectedIndex]?.image || results[0]?.image" alt="生成结果大图" />
           <div class="preview-actions">
             <div class="nav-buttons">
               <button class="secondary" @click.stop="prevImage" :disabled="!hasPrev">上一张</button>
@@ -803,21 +803,18 @@
             selectedImage.value = results.value[selectedIndex.value].image;
           };
 
-          const openPreview = (target) => {
-            if (typeof target === "number") {
-              const item = results.value[target];
-              if (!item) return;
-              selectedIndex.value = target;
-              selectedImage.value = item.image;
-              previewOpen.value = true;
-              return;
+          const openPreview = (targetItem, idx) => {
+            let item = targetItem;
+            if (!item && typeof idx === "number") {
+              item = results.value[idx];
             }
-            const resolved =
-              target || selectedImage.value || results.value[selectedIndex.value]?.image || results.value[0]?.image;
-            if (!resolved) return;
-            const idx = results.value.findIndex((r) => r.image === resolved);
-            selectedIndex.value = idx >= 0 ? idx : 0;
-            selectedImage.value = resolved;
+            if (!item) {
+              item = results.value[selectedIndex.value] || results.value[0];
+            }
+            if (!item) return;
+            const index = idx ?? results.value.findIndex((r) => r.image === item.image);
+            selectedIndex.value = index >= 0 ? index : 0;
+            selectedImage.value = item.image;
             previewOpen.value = true;
           };
 

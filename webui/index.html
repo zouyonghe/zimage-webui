@@ -187,26 +187,37 @@
         color: var(--success);
       }
 
-      .image-frame {
-        width: 100%;
-        aspect-ratio: 1 / 1;
-        border-radius: 16px;
-        border: 1px solid var(--panel-strong);
-        background: rgba(255, 255, 255, 0.02);
+      .image-grid {
         display: grid;
-        place-items: center;
-        overflow: hidden;
-        position: relative;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 10px;
       }
 
-      .image-frame.is-clickable {
+      .thumb {
+        border: 1px solid var(--panel-strong);
+        border-radius: 12px;
+        overflow: hidden;
+        position: relative;
+        background: rgba(255, 255, 255, 0.02);
         cursor: zoom-in;
       }
 
-      .image-frame img {
+      .thumb img {
         width: 100%;
-        height: 100%;
+        height: 180px;
         object-fit: cover;
+        display: block;
+      }
+
+      .thumb .tag {
+        position: absolute;
+        left: 8px;
+        bottom: 8px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.4);
+        font-size: 12px;
+        color: var(--text);
       }
 
       .placeholder {
@@ -455,7 +466,7 @@
           </div>
         </div>
 
-        <div class="row">
+          <div class="row">
           <div>
             <label for="height">高度 (px)</label>
             <input
@@ -519,9 +530,6 @@
         <button class="primary" :disabled="isGenerateDisabled" @click="generate()">
           {{ loading ? "正在生成..." : "生成图片" }}
         </button>
-        <button class="secondary" :disabled="batchRunning || isGenerateDisabled" @click="generateBatch">
-          {{ batchRunning ? `连续生成 ${batchCursor}/${batchTotal}` : `连续生成${batchCount > 1 ? `（${batchCount}张）` : ""}` }}
-        </button>
           <button class="secondary" :disabled="loading || batchRunning" @click="randomizeSeed">随机种子</button>
           <button class="secondary" :disabled="loading || batchRunning" @click="resetPrompt">重置默认</button>
           <button class="secondary" :disabled="!image || loading || batchRunning" @click="downloadImage">保存图片</button>
@@ -545,12 +553,15 @@
 
       <section class="card">
         <h2>生成结果</h2>
-        <div class="image-frame" :class="{'is-clickable': image}" @click="openPreview">
-          <div v-if="loading" class="loader"></div>
-          <img v-else-if="image" :src="image" alt="生成结果" />
-          <div v-else class="placeholder">
-            暂无图片，输入提示词后点击“生成图片”
+        <div v-if="loading" class="loader"></div>
+        <div v-else-if="results.length" class="image-grid">
+          <div class="thumb" v-for="(item, idx) in results" :key="item.meta.seed + '-' + idx" @click="openPreview(item.image)">
+            <img :src="item.image" :alt="`生成结果 ${idx + 1}`" />
+            <div class="tag">{{ item.meta.width }}×{{ item.meta.height }}</div>
           </div>
+        </div>
+        <div v-else class="placeholder">
+          暂无图片，输入提示词后点击“生成图片”
         </div>
       </section>
 
@@ -582,8 +593,8 @@
       </div>
 
       <div v-if="previewOpen" class="preview-overlay" @click.self="closePreview">
-        <div class="preview-body">
-          <img :src="image" alt="生成结果大图" />
+          <div class="preview-body">
+          <img :src="selectedImage || results[0]?.image" alt="生成结果大图" />
           <div class="preview-actions">
             <button class="secondary" @click.stop="downloadImage">下载图片</button>
             <button class="secondary" @click.stop="closePreview">关闭</button>
@@ -615,7 +626,9 @@
           const modelError = ref("");
           const error = ref("");
           const meta = ref(null);
+          const results = ref([]);
           const image = ref("");
+          const selectedImage = ref("");
           const previewOpen = ref(false);
           const history = ref([]);
           const selectedRatio = ref("1:1");
@@ -733,10 +746,12 @@
           };
 
           const downloadImage = () => {
-            if (!image.value) return;
+            const target = selectedImage.value || results.value[0]?.image || "";
+            const targetMeta = results.value.find((r) => r.image === target)?.meta || meta.value;
+            if (!target) return;
             const link = document.createElement("a");
-            link.href = image.value;
-            const saved = meta.value?.saved_path;
+            link.href = target;
+            const saved = targetMeta?.saved_path;
             if (saved) {
               link.download = saved.split(/[\\/]/).pop() || "zimage.png";
             } else {
@@ -747,7 +762,9 @@
           };
 
           const openPreview = () => {
-            if (!image.value) return;
+            const target = selectedImage.value || results.value[0]?.image;
+            if (!target) return;
+            selectedImage.value = target;
             previewOpen.value = true;
           };
 
@@ -755,7 +772,7 @@
             previewOpen.value = false;
           };
 
-          const generate = async (overrides = {}) => {
+          const generateOnce = async (overrides = {}) => {
             // 忽略按钮事件对象，保证不会把 PointerEvent.width/height=1 当成尺寸
             if (overrides instanceof Event) {
               overrides = {};
@@ -770,18 +787,6 @@
               width.value = w;
               return { height: h, width: w };
             })();
-
-            if (modelLoading.value) {
-              error.value = "模型加载中，请稍后再试";
-              return false;
-            }
-            if (modelError.value) {
-              error.value = `模型加载失败: ${modelError.value}`;
-              return false;
-            }
-            error.value = "";
-            loading.value = true;
-            meta.value = null;
 
             const payload = {
               prompt: overrides.prompt ?? prompt.value,
@@ -813,41 +818,51 @@
 
               image.value = data.image;
               meta.value = data.meta || null;
+              selectedImage.value = data.image;
+              results.value = [{ image: data.image, meta: data.meta || {} }, ...results.value].slice(0, 12);
               addToHistory(data);
               return true;
             } catch (err) {
               error.value = err.message || "生成失败";
               return false;
             } finally {
-              loading.value = false;
             }
           };
 
-          const generateBatch = async () => {
+          const generate = async (overrides = {}) => {
+            if (overrides instanceof Event) overrides = {};
             const count = sanitizeBatchCount(batchCount.value);
             batchCount.value = count;
-            if (count <= 1) {
-              await generate();
-              return;
+
+            if (modelLoading.value) {
+              error.value = "模型加载中，请稍后再试";
+              return false;
             }
-            if (batchRunning.value) return;
-            batchRunning.value = true;
+            if (modelError.value) {
+              error.value = `模型加载失败: ${modelError.value}`;
+              return false;
+            }
+
+            error.value = "";
+            loading.value = true;
+            batchRunning.value = count > 1;
             batchTotal.value = count;
             batchCursor.value = 0;
-            error.value = "";
+            meta.value = null;
 
             for (let i = 0; i < count; i += 1) {
               batchCursor.value = i + 1;
               const nextSeed = seed.value === "" ? Math.floor(Math.random() * 1_000_000) : seed.value;
-              seed.value = nextSeed; // 显示当前循环使用的种子，也写入历史
-              console.log("batch generate", batchCursor.value, "/", count, "seed", nextSeed);
-              const ok = await generate({ seed: nextSeed });
+              seed.value = nextSeed;
+              const ok = await generateOnce({ ...overrides, seed: nextSeed });
               if (!ok) break;
             }
 
+            loading.value = false;
             batchRunning.value = false;
             batchCursor.value = 0;
             batchTotal.value = 0;
+            return true;
           };
 
           const applyHistory = (item) => {
@@ -930,8 +945,8 @@
             ratios,
             selectedRatio,
             history,
+            results,
             generate,
-            generateBatch,
             randomizeSeed,
             resetPrompt,
             downloadImage,
@@ -939,6 +954,8 @@
             openPreview,
             closePreview,
             applyRatio,
+            selectedImage,
+            generateOnce,
             onRatioChange,
             snapDimensions,
             batchCount,

@@ -803,16 +803,10 @@
             selectedImage.value = results.value[selectedIndex.value].image;
           };
 
-          const openPreview = (targetItem, idx) => {
-            let item = targetItem;
-            if (!item && typeof idx === "number") {
-              item = results.value[idx];
-            }
-            if (!item) {
-              item = results.value[selectedIndex.value] || results.value[0];
-            }
+          const openPreview = (idx) => {
+            const index = typeof idx === "number" ? idx : selectedIndex.value;
+            const item = results.value[index] || results.value[0];
             if (!item) return;
-            const index = idx ?? results.value.findIndex((r) => r.image === item.image);
             selectedIndex.value = index >= 0 ? index : 0;
             selectedImage.value = item.image;
             previewOpen.value = true;

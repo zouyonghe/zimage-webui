@@ -874,6 +874,8 @@
             if (overrides instanceof Event) overrides = {};
             const count = sanitizeBatchCount(batchCount.value);
             batchCount.value = count;
+            const seedWasEmpty = seed.value === "";
+            const fixedSeed = seedWasEmpty ? null : seed.value;
 
             if (modelLoading.value) {
               error.value = "模型加载中，请稍后再试";
@@ -898,10 +900,13 @@
               const nextSeed =
                 overrides.seed !== undefined
                   ? overrides.seed
-                  : seed.value === ""
+                  : seedWasEmpty
                     ? Math.floor(Math.random() * 1_000_000)
-                    : seed.value;
-              seed.value = nextSeed; // 当前循环使用的种子
+                    : fixedSeed;
+              // 若用户未填写种子，则保持输入框为空，但每次循环使用新的随机种子
+              if (!seedWasEmpty) {
+                seed.value = nextSeed; // 保持用户输入的固定种子
+              }
               const ok = await generateOnce({ ...overrides, seed: nextSeed });
               if (!ok) break;
             }

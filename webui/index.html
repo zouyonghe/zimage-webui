@@ -409,6 +409,36 @@
         min-width: 80px;
       }
 
+      .language-switch {
+        display: flex;
+        background: var(--panel-strong);
+        border-radius: 12px;
+        padding: 4px;
+        gap: 4px;
+      }
+
+      .lang-btn {
+        background: transparent;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--muted);
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .lang-btn.active {
+        background: var(--accent);
+        color: #0c1024;
+      }
+
+      .lang-btn:hover:not(.active) {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text);
+      }
+
       @media (max-width: 720px) {
         body {
           padding: 18px;
@@ -424,36 +454,55 @@
     </style>
   </head>
   <body>
-    <header>
-      <div style="display: flex; align-items: center; gap: 12px">
-        <img class="logo" src="https://avatars.githubusercontent.com/u/246097416?s=48&v=4" alt="Z-Image Logo" />
-        <h1>Z-Image WebUI</h1>
-        <div style="color: var(--muted); margin-top: 4px">
-          输入提示词，在线生成高质量图片
+    <div id="app">
+      <header>
+        <div style="display: flex; align-items: center; gap: 12px">
+          <img class="logo" src="https://avatars.githubusercontent.com/u/246097416?s=48&v=4" alt="Z-Image Logo" />
+          <h1>Z-Image WebUI</h1>
+          <div style="color: var(--muted); margin-top: 4px">
+            {{ t('header.subtitle') }}
+          </div>
         </div>
-      </div>
-    </header>
+        <div style="display: flex; align-items: center; gap: 12px">
+          <div class="language-switch">
+            <button
+              class="lang-btn"
+              :class="{ active: currentLang === 'zh' }"
+              @click="switchLanguage('zh')"
+            >
+              中文
+            </button>
+            <button
+              class="lang-btn"
+              :class="{ active: currentLang === 'en' }"
+              @click="switchLanguage('en')"
+            >
+              EN
+            </button>
+          </div>
+        </div>
+      </header>
 
-    <main class="layout" id="app">
+      <main class="layout">
       <section class="card">
-        <h2>提示词与参数</h2>
-        <label for="prompt">提示词</label>
+        <h2>{{ t('prompt.title') }}</h2>
+        <label for="prompt">{{ t('prompt.title') }}</label>
         <textarea
           id="prompt"
           v-model="prompt"
-          placeholder="描述你想生成的画面..."
+          :placeholder="t('prompt.placeholder')"
         ></textarea>
 
-        <label for="negative">负面提示词</label>
+        <label for="negative">{{ t('negative.title') }}</label>
         <textarea
           id="negative"
           v-model="negativePrompt"
-          placeholder="不想出现的元素，例如：low quality, blurry, watermark"
+          :placeholder="t('negative.placeholder')"
         ></textarea>
 
         <div class="row">
           <div>
-            <label for="steps">采样步数 {{ steps }}</label>
+            <label for="steps">{{ t('steps.label') }} {{ steps }}</label>
             <input
               type="range"
               id="steps"
@@ -465,7 +514,7 @@
             />
           </div>
           <div>
-            <label for="guidance">引导强度 {{ guidance.toFixed(1) }}</label>
+            <label for="guidance">{{ t('guidance.label') }} {{ guidance.toFixed(1) }}</label>
             <input
               type="range"
               id="guidance"
@@ -480,7 +529,7 @@
 
           <div class="row">
           <div>
-            <label for="height">高度 (px)</label>
+            <label for="height">{{ t('height.label') }}</label>
             <input
               type="number"
               id="height"
@@ -493,7 +542,7 @@
             />
           </div>
           <div>
-            <label for="width">宽度 (px)</label>
+            <label for="width">{{ t('width.label') }}</label>
             <input
               type="number"
               id="width"
@@ -506,17 +555,17 @@
             />
           </div>
           <div>
-            <label for="seed">随机种子 (可选)</label>
+            <label for="seed">{{ t('seed.label') }}</label>
             <input
               type="number"
               id="seed"
               v-model="seed"
-              placeholder="留空则随机"
+              :placeholder="t('seed.placeholder')"
               title="固定种子以复现同一结果；留空自动随机"
             />
           </div>
           <div>
-            <label for="batchCount">连续生成张数</label>
+            <label for="batchCount">{{ t('batchCount.label') }}</label>
             <input
               type="number"
               id="batchCount"
@@ -530,7 +579,7 @@
         </div>
 
         <div>
-          <label>画幅预设</label>
+          <label>{{ t('ratio.label') }}</label>
           <select v-model="selectedRatio" @change="onRatioChange">
             <option v-for="ratio in ratios" :key="ratio.label" :value="ratio.label">
               {{ ratio.label }} ({{ ratio.width }}×{{ ratio.height }})
@@ -540,39 +589,39 @@
 
         <div class="actions">
         <button class="primary" :disabled="isGenerateDisabled" @click="generate()">
-          {{ loading ? "正在生成..." : "生成图片" }}
+          {{ loading ? t('generate.loading') : t('generate.button') }}
         </button>
-          <button class="secondary" :disabled="loading || batchRunning" @click="randomizeSeed">随机种子</button>
-          <button class="secondary" :disabled="loading || batchRunning" @click="resetPrompt">重置默认</button>
-          <button class="secondary" :disabled="!image || loading || batchRunning" @click="downloadImage">保存图片</button>
+          <button class="secondary" :disabled="loading || batchRunning" @click="randomizeSeed">{{ t('randomSeed.button') }}</button>
+          <button class="secondary" :disabled="loading || batchRunning" @click="resetPrompt">{{ t('reset.button') }}</button>
+          <button class="secondary" :disabled="!image || loading || batchRunning" @click="downloadImage">{{ t('save.button') }}</button>
         </div>
 
         <div class="status" :class="{'error': error || modelError, 'success': successMsg}">
           <span v-if="error">⚠ {{ error }}</span>
-          <span v-else-if="successMsg">✅ {{ successMsg }}</span>
+          <span v-else-if="successMsg">✅ {{ t('status.completed') }}</span>
           <span v-else>{{ statusLabel }}</span>
         </div>
 
         <div class="meta" v-if="meta">
-          <div class="pill">设备: {{ meta.device }}</div>
-          <div class="pill">步数: {{ meta.steps }}</div>
-          <div class="pill">引导: {{ meta.guidance }}</div>
-          <div class="pill">尺寸: {{ meta.width }} × {{ meta.height }}</div>
-          <div class="pill" v-if="meta.negative_prompt">负面: {{ meta.negative_prompt }}</div>
-          <div class="pill" v-if="meta.seed !== null">种子: {{ meta.seed }}</div>
+          <div class="pill">{{ t('meta.device') }}: {{ meta.device }}</div>
+          <div class="pill">{{ t('meta.steps') }}: {{ meta.steps }}</div>
+          <div class="pill">{{ t('meta.guidance') }}: {{ meta.guidance }}</div>
+          <div class="pill">{{ t('meta.size') }}: {{ meta.width }} × {{ meta.height }}</div>
+          <div class="pill" v-if="meta.negative_prompt">{{ t('meta.negative') }}: {{ meta.negative_prompt }}</div>
+          <div class="pill" v-if="meta.seed !== null">{{ t('meta.seed') }}: {{ meta.seed }}</div>
         </div>
       </section>
 
       <section class="card">
-        <h2>生成结果</h2>
+        <h2>{{ t('results.title') }}</h2>
         <div v-if="results.length" class="image-grid">
           <div class="thumb" v-for="(item, idx) in results" :key="item.meta.seed + '-' + idx" @click="openPreview(idx)">
-            <img :src="item.image" :alt="`生成结果 ${idx + 1}`" />
+            <img :src="item.image" :alt="`${t('results.title')} ${idx + 1}`" />
             <div class="tag">{{ item.meta.width }}×{{ item.meta.height }}</div>
           </div>
         </div>
         <div v-else class="placeholder">
-          暂无图片，输入提示词后点击“生成图片”
+          {{ t('results.placeholder') }}
         </div>
         <div v-if="loading" style="margin-top: 12px; display: flex; justify-content: center;">
           <div class="loader"></div>
@@ -581,24 +630,24 @@
 
       <section class="card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <h2>历史记录</h2>
-          <button class="secondary" :disabled="history.length === 0" @click="clearHistory">清空</button>
+          <h2>{{ t('history.title') }}</h2>
+          <button class="secondary" :disabled="history.length === 0" @click="clearHistory">{{ t('history.clear') }}</button>
         </div>
-        <div v-if="history.length === 0" class="placeholder">暂无历史记录</div>
+        <div v-if="history.length === 0" class="placeholder">{{ t('history.placeholder') }}</div>
         <div v-else class="history-list">
           <div class="history-item" v-for="item in history" :key="item.id">
             <img class="history-thumb" :src="item.image" alt="历史缩略图" />
             <div>
               <div class="history-meta">
                 {{ item.prompt }}
-                <div>步数: {{ item.steps }} | 引导: {{ item.guidance }} | 种子: {{ item.seed ?? "随机" }}</div>
-                <div>尺寸: {{ item.width }}×{{ item.height }}</div>
-                <div v-if="item.negative">负面: {{ item.negative }}</div>
+                <div>{{ t('history.steps') }}: {{ item.steps }} | {{ t('history.guidance') }}: {{ item.guidance }} | {{ t('history.seed') }}: {{ item.seed ?? t('seed.placeholder') }}</div>
+                <div>{{ t('history.size') }}: {{ item.width }}×{{ item.height }}</div>
+                <div v-if="item.negative">{{ t('history.negative') }}: {{ item.negative }}</div>
               </div>
               <div class="history-actions">
-                <button class="secondary" @click="applyHistory(item)">回填</button>
-                <button class="secondary" @click="regenerate(item)">再次生成</button>
-                <button class="secondary" @click="deleteHistory(item.id)">删除</button>
+                <button class="secondary" @click="applyHistory(item)">{{ t('history.refill') }}</button>
+                <button class="secondary" @click="regenerate(item)">{{ t('history.regenerate') }}</button>
+                <button class="secondary" @click="deleteHistory(item.id)">{{ t('history.delete') }}</button>
               </div>
             </div>
           </div>
@@ -611,28 +660,132 @@
 
       <div v-if="previewOpen" class="preview-overlay" @click.self="closePreview">
           <div class="preview-body">
-          <img :src="selectedImage || results[selectedIndex]?.image || results[0]?.image" alt="生成结果大图" />
+          <img :src="selectedImage || results[selectedIndex]?.image || results[0]?.image" :alt="t('results.title')" />
           <div class="preview-actions">
             <div class="nav-buttons">
-              <button class="secondary" @click.stop="prevImage" :disabled="!hasPrev">上一张</button>
-              <button class="secondary" @click.stop="nextImage" :disabled="!hasNext">下一张</button>
+              <button class="secondary" @click.stop="prevImage" :disabled="!hasPrev">{{ t('preview.previous') }}</button>
+              <button class="secondary" @click.stop="nextImage" :disabled="!hasNext">{{ t('preview.next') }}</button>
             </div>
             <div style="display:flex; gap:8px; margin-left:auto;">
-              <button class="secondary" @click.stop="downloadImage">下载图片</button>
-              <button class="secondary" @click.stop="closePreview">关闭</button>
+              <button class="secondary" @click.stop="downloadImage">{{ t('preview.download') }}</button>
+              <button class="secondary" @click.stop="closePreview">{{ t('preview.close') }}</button>
             </div>
           </div>
         </div>
       </div>
-    </main>
+      </main>
+    </div>
 
     <script type="module">
-      import { createApp, ref, computed, onMounted } from "https://unpkg.com/vue@3/dist/vue.esm-browser.js";
+      import { createApp, ref, computed, onMounted, watch } from "https://unpkg.com/vue@3/dist/vue.esm-browser.js";
 
       const DEFAULT_PROMPT = "a cat sitting on a chair, high quality, detailed";
 
       createApp({
         setup() {
+          // 翻译数据
+          const translations = {
+            zh: {
+              'header.subtitle': '输入提示词，在线生成高质量图片',
+              'prompt.title': '提示词与参数',
+              'prompt.title_simple': '提示词',
+              'prompt.placeholder': '描述你想生成的画面...',
+              'negative.title': '负面提示词',
+              'negative.placeholder': '不想出现的元素，例如：low quality, blurry, watermark',
+              'steps.label': '采样步数',
+              'guidance.label': '引导强度',
+              'height.label': '高度 (px)',
+              'width.label': '宽度 (px)',
+              'seed.label': '随机种子 (可选)',
+              'seed.placeholder': '留空则随机',
+              'batchCount.label': '连续生成张数',
+              'ratio.label': '画幅预设',
+              'generate.button': '生成图片',
+              'generate.loading': '正在生成...',
+              'randomSeed.button': '随机种子',
+              'reset.button': '重置默认',
+              'save.button': '保存图片',
+              'results.title': '生成结果',
+              'results.placeholder': '暂无图片，输入提示词后点击"生成图片"',
+              'history.title': '历史记录',
+              'history.clear': '清空',
+              'history.placeholder': '暂无历史记录',
+              'history.refill': '回填',
+              'history.regenerate': '再次生成',
+              'history.delete': '删除',
+              'preview.previous': '上一张',
+              'preview.next': '下一张',
+              'preview.download': '下载图片',
+              'preview.close': '关闭',
+              'status.ready': '已就绪',
+              'status.loading': '模型加载中...',
+              'status.generating': '正在生成...',
+              'status.batchGenerating': '连续生成中',
+              'status.loadFailed': '加载失败',
+              'status.completed': '生成完成',
+              'meta.device': '设备',
+              'meta.steps': '步数',
+              'meta.guidance': '引导',
+              'meta.size': '尺寸',
+              'meta.negative': '负面',
+              'meta.seed': '种子',
+              'history.steps': '步数',
+              'history.guidance': '引导',
+              'history.seed': '种子',
+              'history.size': '尺寸',
+              'history.negative': '负面'
+            },
+            en: {
+              'header.subtitle': 'Enter prompts to generate high-quality images online',
+              'prompt.title': 'Prompt & Parameters',
+              'prompt.title_simple': 'Prompt',
+              'prompt.placeholder': 'Describe the image you want to generate...',
+              'negative.title': 'Negative Prompt',
+              'negative.placeholder': 'Elements to avoid, e.g.: low quality, blurry, watermark',
+              'steps.label': 'Sampling Steps',
+              'guidance.label': 'Guidance Scale',
+              'height.label': 'Height (px)',
+              'width.label': 'Width (px)',
+              'seed.label': 'Random Seed (Optional)',
+              'seed.placeholder': 'Leave empty for random',
+              'batchCount.label': 'Batch Count',
+              'ratio.label': 'Aspect Ratio Presets',
+              'generate.button': 'Generate Image',
+              'generate.loading': 'Generating...',
+              'randomSeed.button': 'Random Seed',
+              'reset.button': 'Reset to Default',
+              'save.button': 'Save Image',
+              'results.title': 'Generated Results',
+              'results.placeholder': 'No images yet. Enter a prompt and click "Generate Image"',
+              'history.title': 'History',
+              'history.clear': 'Clear',
+              'history.placeholder': 'No history yet',
+              'history.refill': 'Refill',
+              'history.regenerate': 'Regenerate',
+              'history.delete': 'Delete',
+              'preview.previous': 'Previous',
+              'preview.next': 'Next',
+              'preview.download': 'Download Image',
+              'preview.close': 'Close',
+              'status.ready': 'Ready',
+              'status.loading': 'Model loading...',
+              'status.generating': 'Generating...',
+              'status.batchGenerating': 'Batch generating',
+              'status.loadFailed': 'Load failed',
+              'status.completed': 'Generation completed',
+              'meta.device': 'Device',
+              'meta.steps': 'Steps',
+              'meta.guidance': 'Guidance',
+              'meta.size': 'Size',
+              'meta.negative': 'Negative',
+              'meta.seed': 'Seed',
+              'history.steps': 'Steps',
+              'history.guidance': 'Guidance',
+              'history.seed': 'Seed',
+              'history.size': 'Size',
+              'history.negative': 'Negative'
+            }
+          };
           const prompt = ref(DEFAULT_PROMPT);
           const negativePrompt = ref("");
           const steps = ref(9);
@@ -656,6 +809,29 @@
           const previewOpen = ref(false);
           const history = ref([]);
           const selectedRatio = ref("1:1 512");
+          
+          // 语言相关状态
+          const currentLang = ref(localStorage.getItem('zimage-lang') || 'zh');
+          
+          // 翻译函数
+          const t = (key) => {
+            return translations[currentLang.value][key] || key;
+          };
+          
+          // 语言切换函数
+          const switchLanguage = (lang) => {
+            currentLang.value = lang;
+            localStorage.setItem('zimage-lang', lang);
+          };
+
+          // 同步页面 lang 属性，便于切换语种
+          watch(
+            currentLang,
+            (lang) => {
+              document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+            },
+            { immediate: true }
+          );
           const ratios = [
             { label: "1:1 512", width: 512, height: 512 },
             { label: "1:1 768", width: 768, height: 768 },
@@ -682,13 +858,13 @@
             "a spaceship landing on a lush alien planet, epic scale, vibrant colors, concept art",
           ];
 
-          const successMsg = computed(() => (image.value && !loading.value && !error.value ? "生成完成" : ""));
+          const successMsg = computed(() => (image.value && !loading.value && !error.value ? t('status.completed') : ""));
           const statusLabel = computed(() => {
-            if (modelError.value) return `加载失败: ${modelError.value}`;
-            if (batchRunning.value) return `连续生成中 ${batchCursor.value}/${batchTotal.value}`;
-            if (loading.value) return "正在生成...";
-            if (modelLoading.value) return "模型加载中...";
-            return "已就绪";
+            if (modelError.value) return `${t('status.loadFailed')}: ${modelError.value}`;
+            if (batchRunning.value) return `${t('status.batchGenerating')} ${batchCursor.value}/${batchTotal.value}`;
+            if (loading.value) return t('status.generating');
+            if (modelLoading.value) return t('status.loading');
+            return t('status.ready');
           });
           const statusTone = computed(() => {
             if (modelError.value) return "var(--danger)";
@@ -887,7 +1063,7 @@
               return false;
             }
             if (modelLoading.value) {
-              error.value = "模型加载中，请稍后再试";
+              error.value = t('status.loading');
               return false;
             }
             if (modelError.value) {
@@ -1033,10 +1209,14 @@
             batchRunning,
             batchCursor,
             batchTotal,
+            isGenerateDisabled,
             applyHistory,
             regenerate,
             deleteHistory,
             clearHistory,
+            currentLang,
+            t,
+            switchLanguage,
           };
         },
       }).mount("#app");

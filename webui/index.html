@@ -479,6 +479,13 @@
             >
               EN
             </button>
+            <button
+              class="lang-btn"
+              :class="{ active: currentLang === 'ja' }"
+              @click="switchLanguage('ja')"
+            >
+              日本語
+            </button>
           </div>
         </div>
       </header>
@@ -784,6 +791,56 @@
               'history.seed': 'Seed',
               'history.size': 'Size',
               'history.negative': 'Negative'
+            },
+            ja: {
+              'header.subtitle': 'プロンプトを入力して高品質な画像を生成',
+              'prompt.title': 'プロンプトとパラメータ',
+              'prompt.title_simple': 'プロンプト',
+              'prompt.placeholder': '生成したい画像を説明してください...',
+              'negative.title': 'ネガティブプロンプト',
+              'negative.placeholder': '含めたくない要素 例: low quality, blurry, watermark',
+              'steps.label': 'サンプリングステップ',
+              'guidance.label': 'ガイダンス強度',
+              'height.label': '高さ (px)',
+              'width.label': '幅 (px)',
+              'seed.label': 'ランダムシード (任意)',
+              'seed.placeholder': '空ならランダム',
+              'batchCount.label': '連続生成枚数',
+              'ratio.label': 'アスペクト比プリセット',
+              'generate.button': '画像を生成',
+              'generate.loading': '生成中...',
+              'randomSeed.button': 'ランダムシード',
+              'reset.button': 'デフォルトにリセット',
+              'save.button': '画像を保存',
+              'results.title': '生成結果',
+              'results.placeholder': 'まだ画像がありません。プロンプトを入力して「画像を生成」を押してください',
+              'history.title': '履歴',
+              'history.clear': 'クリア',
+              'history.placeholder': '履歴がありません',
+              'history.refill': '再入力',
+              'history.regenerate': '再生成',
+              'history.delete': '削除',
+              'preview.previous': '前へ',
+              'preview.next': '次へ',
+              'preview.download': '画像をダウンロード',
+              'preview.close': '閉じる',
+              'status.ready': '準備完了',
+              'status.loading': 'モデル読み込み中...',
+              'status.generating': '生成中...',
+              'status.batchGenerating': '連続生成中',
+              'status.loadFailed': '読み込み失敗',
+              'status.completed': '生成完了',
+              'meta.device': 'デバイス',
+              'meta.steps': 'ステップ',
+              'meta.guidance': 'ガイダンス',
+              'meta.size': 'サイズ',
+              'meta.negative': 'ネガティブ',
+              'meta.seed': 'シード',
+              'history.steps': 'ステップ',
+              'history.guidance': 'ガイダンス',
+              'history.seed': 'シード',
+              'history.size': 'サイズ',
+              'history.negative': 'ネガティブ'
             }
           };
           const prompt = ref(DEFAULT_PROMPT);

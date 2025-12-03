@@ -200,6 +200,7 @@
         position: relative;
         background: rgba(255, 255, 255, 0.02);
         cursor: zoom-in;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
       }
 
       .thumb img {
@@ -377,16 +378,16 @@
         border: 1px solid var(--panel-strong);
         border-radius: 16px;
         padding: 16px;
-        max-width: 90vw;
-        max-height: 90vh;
+        max-width: 95vw;
+        max-height: 95vh;
         display: grid;
         gap: 12px;
         box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
       }
 
       .preview-body img {
-        max-width: 78vw;
-        max-height: 70vh;
+        max-width: 88vw;
+        max-height: 80vh;
         border-radius: 12px;
         object-fit: contain;
         justify-self: center;
@@ -598,6 +599,13 @@
         <button class="primary" :disabled="isGenerateDisabled" @click="generate()">
           {{ loading ? t('generate.loading') : t('generate.button') }}
         </button>
+          <button
+            class="secondary"
+            :disabled="!(loading || batchRunning) || stopRequested"
+            @click="requestStop"
+          >
+            {{ stopRequested ? t('stop.requested') : t('stop.button') }}
+          </button>
           <button class="secondary" :disabled="loading || batchRunning" @click="randomizeSeed">{{ t('randomSeed.button') }}</button>
           <button class="secondary" :disabled="loading || batchRunning" @click="resetPrompt">{{ t('reset.button') }}</button>
           <button class="secondary" :disabled="!image || loading || batchRunning" @click="downloadImage">{{ t('save.button') }}</button>
@@ -622,7 +630,12 @@
       <section class="card">
         <h2>{{ t('results.title') }}</h2>
         <div v-if="results.length" class="image-grid">
-          <div class="thumb" v-for="(item, idx) in results" :key="item.meta.seed + '-' + idx" @click="openPreview(idx)">
+          <div
+            class="thumb"
+            v-for="(item, idx) in results"
+            :key="item.id"
+            @click="openPreview(idx)"
+          >
             <img :src="item.image" :alt="`${t('results.title')} ${idx + 1}`" />
             <div class="tag">{{ item.meta.width }}×{{ item.meta.height }}</div>
           </div>
@@ -728,8 +741,11 @@
               'status.loading': '模型加载中...',
               'status.generating': '正在生成...',
               'status.batchGenerating': '连续生成中',
+              'status.stopRequested': '已请求停止，当前图片完成后终止',
               'status.loadFailed': '加载失败',
               'status.completed': '生成完成',
+              'stop.button': '停止生成',
+              'stop.requested': '等待当前完成后停止',
               'meta.device': '设备',
               'meta.steps': '步数',
               'meta.guidance': '引导',
@@ -778,8 +794,11 @@
               'status.loading': 'Model loading...',
               'status.generating': 'Generating...',
               'status.batchGenerating': 'Batch generating',
+              'status.stopRequested': 'Stop requested; will halt after current image',
               'status.loadFailed': 'Load failed',
               'status.completed': 'Generation completed',
+              'stop.button': 'Stop',
+              'stop.requested': 'Stopping after current image',
               'meta.device': 'Device',
               'meta.steps': 'Steps',
               'meta.guidance': 'Guidance',
@@ -828,8 +847,11 @@
               'status.loading': 'モデル読み込み中...',
               'status.generating': '生成中...',
               'status.batchGenerating': '連続生成中',
+              'status.stopRequested': '停止をリクエストしました。現在の画像が終わったら停止',
               'status.loadFailed': '読み込み失敗',
               'status.completed': '生成完了',
+              'stop.button': '停止',
+              'stop.requested': 'この画像の後で停止',
               'meta.device': 'デバイス',
               'meta.steps': 'ステップ',
               'meta.guidance': 'ガイダンス',
@@ -846,14 +868,15 @@
           const prompt = ref(DEFAULT_PROMPT);
           const negativePrompt = ref("");
           const steps = ref(9);
-          const guidance = ref(0);
+      const guidance = ref(0);
           const height = ref(512);
           const width = ref(512);
           const seed = ref("");
           const batchCount = ref(1);
           const batchRunning = ref(false);
-          const batchCursor = ref(0);
+      const batchCursor = ref(0);
           const batchTotal = ref(0);
+          const stopRequested = ref(false);
           const loading = ref(false);
           const modelLoading = ref(true);
           const modelError = ref("");
@@ -918,6 +941,7 @@
           const successMsg = computed(() => (image.value && !loading.value && !error.value ? t('status.completed') : ""));
           const statusLabel = computed(() => {
             if (modelError.value) return `${t('status.loadFailed')}: ${modelError.value}`;
+            if (stopRequested.value && (loading.value || batchRunning.value)) return t('status.stopRequested');
             if (batchRunning.value) return `${t('status.batchGenerating')} ${batchCursor.value}/${batchTotal.value}`;
             if (loading.value) return t('status.generating');
             if (modelLoading.value) return t('status.loading');
@@ -1006,20 +1030,30 @@
             history.value = [entry, ...history.value].slice(0, 12);
           };
 
-          const downloadImage = () => {
-            const target = selectedImage.value || results.value[selectedIndex.value]?.image || "";
-            const targetMeta = results.value[selectedIndex.value]?.meta || results.value.find((r) => r.image === target)?.meta || meta.value;
-            if (!target) return;
-            const link = document.createElement("a");
-            link.href = target;
+          const makeFilename = (targetMeta, fallbackIndex = 0) => {
             const saved = targetMeta?.saved_path;
             if (saved) {
-              link.download = saved.split(/[\\/]/).pop() || "zimage.png";
-            } else {
-              const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 15);
-              link.download = `zimage_${stamp}.png`;
+              return saved.split(/[\\/]/).pop() || `zimage_${fallbackIndex + 1}.png`;
             }
-            link.click();
+            const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 15);
+            return `zimage_${stamp}_${fallbackIndex + 1}.png`;
+          };
+
+          const downloadImage = () => {
+            if (!results.value.length) return;
+            results.value.forEach((item, idx) => {
+              const link = document.createElement("a");
+              link.href = item.image;
+              link.download = makeFilename(item.meta, idx);
+              link.click();
+            });
+          };
+
+
+          const requestStop = () => {
+            if (loading.value || batchRunning.value) {
+              stopRequested.value = true;
+            }
           };
 
           const hasPrev = computed(() => selectedIndex.value > 0);
@@ -1063,8 +1097,12 @@
               const resolvedWidth = overrides.width ?? width.value;
               const h = sanitizeDimension(resolvedHeight);
               const w = sanitizeDimension(resolvedWidth);
-              height.value = h;
-              width.value = w;
+              if (overrides.height === undefined) {
+                height.value = h;
+              }
+              if (overrides.width === undefined) {
+                width.value = w;
+              }
               return { height: h, width: w };
             })();
 
@@ -1099,7 +1137,8 @@
               image.value = data.image;
               meta.value = data.meta || null;
               selectedImage.value = data.image;
-              results.value = [{ image: data.image, meta: data.meta || {} }, ...results.value].slice(0, 12);
+              const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+              results.value = [{ id, image: data.image, meta: data.meta || {} }, ...results.value].slice(0, 12);
               addToHistory(data);
               return true;
             } catch (err) {
@@ -1115,6 +1154,27 @@
             batchCount.value = count;
             const seedWasEmpty = seed.value === "";
             const fixedSeed = seedWasEmpty ? null : seed.value;
+            const alignedDims = (() => {
+              const baseHeight = overrides.height ?? height.value;
+              const baseWidth = overrides.width ?? width.value;
+              const safeHeight = sanitizeDimension(baseHeight);
+              const safeWidth = sanitizeDimension(baseWidth);
+              if (overrides.height === undefined) {
+                height.value = safeHeight;
+              }
+              if (overrides.width === undefined) {
+                width.value = safeWidth;
+              }
+              return { height: safeHeight, width: safeWidth };
+            })();
+            const fixedParams = {
+              prompt: overrides.prompt ?? prompt.value,
+              negative_prompt: overrides.negative_prompt ?? negativePrompt.value,
+              steps: overrides.steps ?? steps.value,
+              guidance: overrides.guidance ?? guidance.value,
+              width: alignedDims.width,
+              height: alignedDims.height,
+            };
 
             if (loading.value || batchRunning.value) {
               return false;
@@ -1133,6 +1193,7 @@
             batchRunning.value = count > 1;
             batchTotal.value = count;
             batchCursor.value = 0;
+            stopRequested.value = false;
             meta.value = null;
             results.value = [];
             selectedImage.value = "";
@@ -1149,14 +1210,15 @@
               if (!seedWasEmpty) {
                 seed.value = nextSeed; // 保持用户输入的固定种子
               }
-              const ok = await generateOnce({ ...overrides, seed: nextSeed });
-              if (!ok) break;
+              const ok = await generateOnce({ ...fixedParams, seed: nextSeed });
+              if (!ok || stopRequested.value) break;
             }
 
             loading.value = false;
             batchRunning.value = false;
             batchCursor.value = 0;
             batchTotal.value = 0;
+            stopRequested.value = false;
             return true;
           };
 
@@ -1266,6 +1328,7 @@
             batchRunning,
             batchCursor,
             batchTotal,
+            stopRequested,
             isGenerateDisabled,
             applyHistory,
             regenerate,
@@ -1274,6 +1337,7 @@
             currentLang,
             t,
             switchLanguage,
+            requestStop,
           };
         },
       }).mount("#app");

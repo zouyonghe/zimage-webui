@@ -21,7 +21,7 @@
 
 pip install -r requirements.txt
 
-# 下载模型权重（需先安装 aria2c；默认使用国内镜像）
+# 下载模型权重（需先安装 aria2c；默认使用国内镜像，脚本会放到仓库根的 zimage-model/ 下）
 cd scripts && bash download_models.sh && cd ..
 ```
 

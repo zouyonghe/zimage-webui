@@ -1,4 +1,9 @@
 #!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+MODEL_DIR="$ROOT_DIR/zimage-model"
 
 base="https://hf-mirror.com/Tongyi-MAI/Z-Image-Turbo/resolve/main"
 
@@ -14,8 +19,12 @@ files=(
 "vae/diffusion_pytorch_model.safetensors"  # VAE
 )
 
+cd "$ROOT_DIR"
+
 for f in "${files[@]}"; do
-    mkdir -p "$(dirname "$f")"
-    echo "Downloading $f..."
-    aria2c -x 16 -s 16 -k 5M "$base/$f" -o "$f"
+    target_dir="$MODEL_DIR/$(dirname "$f")"
+    target_file="$(basename "$f")"
+    mkdir -p "$target_dir"
+    echo "Downloading $f -> $MODEL_DIR/$f"
+    aria2c -x 16 -s 16 -k 5M "$base/$f" -d "$target_dir" -o "$target_file"
 done

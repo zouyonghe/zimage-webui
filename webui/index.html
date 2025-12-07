@@ -1500,13 +1500,13 @@
           const prompt = ref(DEFAULT_PROMPT);
           const negativePrompt = ref("");
           const steps = ref(9);
-      const guidance = ref(0);
+          const guidance = ref(0);
           const height = ref(512);
           const width = ref(512);
           const seed = ref("");
           const batchCount = ref(1);
           const batchRunning = ref(false);
-      const batchCursor = ref(0);
+          const batchCursor = ref(0);
           const batchTotal = ref(0);
           const stopRequested = ref(false);
           const loading = ref(false);
@@ -1944,102 +1944,102 @@
           const streamGenerateOnce = async (payload) => {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
-            const res = await fetch("/generate_stream", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-              signal: controller.signal,
-            });
-            if (!res.ok || !res.body) {
-              const text = await res.text();
-              clearTimeout(timeout);
-              throw new Error(text || "Failed to start generation");
-            }
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = "";
-            let lastEventAt = Date.now();
-
             const cleanup = () => clearTimeout(timeout);
-
-            const promise = new Promise((resolve, reject) => {
-              const handleEvent = (eventName, data) => {
-                lastEventAt = Date.now();
-                if (eventName === "progress") {
-                  const step = Number(data?.step || 0);
-                  const total = Number(data?.total_steps || payload.steps || steps.value || 0);
-                  stepProgress.value = { current: step, total };
-                  if (data?.note === "no_callback") {
-                    startFakeProgress(total);
-                  } else {
-                    clearFakeProgress();
-                  }
-                } else if (eventName === "complete") {
-                  stepProgress.value = { current: payload.steps || steps.value || 0, total: payload.steps || steps.value || 0 };
-                  clearFakeProgress();
-                  cleanup();
-                  resolve(data);
-                } else if (eventName === "error") {
-                  clearFakeProgress();
-                  cleanup();
-                  reject(new Error(data?.error || "Generation failed"));
-                }
-              };
-
-              const processBuffer = () => {
-                let idx;
-                while ((idx = buffer.indexOf("\n\n")) !== -1) {
-                  const rawEvent = buffer.slice(0, idx).trim();
-                  buffer = buffer.slice(idx + 2);
-                  if (!rawEvent) continue;
-                  const lines = rawEvent.split("\n");
-                  let eventName = "message";
-                  let dataLines = [];
-                  for (const line of lines) {
-                    if (line.startsWith("event:")) eventName = line.slice(6).trim();
-                    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
-                  }
-                  const dataStr = dataLines.join("\n");
-                  let parsed = {};
-                  try {
-                    parsed = dataStr ? JSON.parse(dataStr) : {};
-                  } catch {
-                    parsed = {};
-                  }
-                  handleEvent(eventName, parsed);
-                }
-              };
-
-              const pump = async () => {
-                try {
-                  while (true) {
-                    // watchdog: if no event in STREAM_TIMEOUT_MS, abort
-                    if (Date.now() - lastEventAt > STREAM_TIMEOUT_MS) {
-                      throw new Error("stream timeout");
-                    }
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    buffer += decoder.decode(value, { stream: true });
-                    processBuffer();
-                  }
-                  cleanup();
-                  reject(new Error("Connection closed before completion"));
-                } catch (err) {
-                  cleanup();
-                  clearFakeProgress();
-                  reject(err);
-                }
-              };
-
-              pump();
-            });
-
             try {
+              const res = await fetch("/generate_stream", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+                signal: controller.signal,
+              });
+              if (!res.ok || !res.body) {
+                const text = await res.text();
+                throw new Error(text || "Failed to start generation");
+              }
+              const reader = res.body.getReader();
+              const decoder = new TextDecoder();
+              let buffer = "";
+              let lastEventAt = Date.now();
+              let finished = false;
+
+              const promise = new Promise((resolve, reject) => {
+                const handleEvent = (eventName, data) => {
+                  lastEventAt = Date.now();
+                  if (eventName === "progress") {
+                    const step = Number(data?.step || 0);
+                    const total = Number(data?.total_steps || payload.steps || steps.value || 0);
+                    stepProgress.value = { current: step, total };
+                    if (data?.note === "no_callback") {
+                      startFakeProgress(total);
+                    } else {
+                      clearFakeProgress();
+                    }
+                  } else if (eventName === "complete") {
+                    stepProgress.value = { current: payload.steps || steps.value || 0, total: payload.steps || steps.value || 0 };
+                    clearFakeProgress();
+                    finished = true;
+                    reader.cancel().catch(() => {});
+                    resolve(data);
+                  } else if (eventName === "error") {
+                    clearFakeProgress();
+                    finished = true;
+                    reader.cancel().catch(() => {});
+                    reject(new Error(data?.error || "Generation failed"));
+                  }
+                };
+
+                const processBuffer = () => {
+                  let idx;
+                  while ((idx = buffer.indexOf("\n\n")) !== -1) {
+                    const rawEvent = buffer.slice(0, idx).trim();
+                    buffer = buffer.slice(idx + 2);
+                    if (!rawEvent) continue;
+                    const lines = rawEvent.split("\n");
+                    let eventName = "message";
+                    let dataLines = [];
+                    for (const line of lines) {
+                      if (line.startsWith("event:")) eventName = line.slice(6).trim();
+                      else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+                    }
+                    const dataStr = dataLines.join("\n");
+                    let parsed = {};
+                    try {
+                      parsed = dataStr ? JSON.parse(dataStr) : {};
+                    } catch {
+                      parsed = {};
+                    }
+                    handleEvent(eventName, parsed);
+                  }
+                };
+
+                const pump = async () => {
+                  try {
+                    while (true) {
+                      if (finished) return;
+                      if (Date.now() - lastEventAt > STREAM_TIMEOUT_MS) {
+                        throw new Error("stream timeout");
+                      }
+                      const { value, done } = await reader.read();
+                      if (done) break;
+                      buffer += decoder.decode(value, { stream: true });
+                      processBuffer();
+                    }
+                    if (!finished) {
+                      reject(new Error("Connection closed before completion"));
+                    }
+                  } catch (err) {
+                    clearFakeProgress();
+                    reject(err);
+                  }
+                };
+
+                pump();
+              });
+
               return await promise;
             } catch (err) {
               clearFakeProgress();
-              const aborted = controller.signal.aborted || /timeout/i.test(err?.message || "");
-              // 流式失败兜底走非流式接口，避免批量中断
+              const aborted = controller.signal.aborted || /abort|timeout/i.test(err?.message || "");
               try {
                 return await fallbackGenerateOnce(payload);
               } catch (fallbackErr) {
@@ -2048,6 +2048,8 @@
                 }
                 throw fallbackErr;
               }
+            } finally {
+              cleanup();
             }
           };
 
@@ -2200,91 +2202,112 @@
             return { image: "", meta: {} };
           };
 
-          const streamUpscale = async (payload, isAuto = false) => {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), UPSCALE_TIMEOUT_MS);
-            const res = await fetch("/upscale_stream", {
+          const fallbackUpscaleOnce = async (payload) => {
+            const res = await fetch("/upscale", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),
-              signal: controller.signal,
             });
-            if (!res.ok || !res.body) {
+            if (!res.ok) {
               const text = await res.text();
-              clearTimeout(timeout);
-              throw new Error(text || "Failed to start upscale");
+              throw new Error(text || "Upscale failed");
             }
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = "";
-            let finished = false;
+            const data = await res.json();
+            upscaleStepProgress.value = { current: 1, total: 1 };
+            return data;
+          };
+
+          const streamUpscale = async (payload, isAuto = false) => {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), UPSCALE_TIMEOUT_MS);
             const cleanup = () => clearTimeout(timeout);
-            return new Promise((resolve, reject) => {
-              const handleEvent = (eventName, data) => {
-                if (eventName === "progress") {
-                  const current = Number(data?.current || 0);
-                  const total = Number(data?.total || 0) || current || 1;
-                  upscaleStepProgress.value = { current, total };
-                  return;
-                }
-                if (eventName === "result") {
-                  const current = upscaleStepProgress.value.current || 1;
-                  const total = upscaleStepProgress.value.total || current || 1;
-                  upscaleStepProgress.value = { current: total, total };
-                  finished = true;
-                  cleanup();
-                  reader.cancel().catch(() => {});
-                  resolve(data);
-                  return;
-                }
-                if (eventName === "error") {
-                  cleanup();
-                  reject(new Error(data?.message || "Upscale failed"));
-                  finished = true;
-                  reader.cancel().catch(() => {});
-                  return;
-                }
-              };
-              const read = () => {
-                reader.read().then(({ done, value }) => {
-                  if (done) {
-                    if (!finished) {
-                      cleanup();
-                      reject(new Error("Upscale interrupted"));
-                    }
+            try {
+              const res = await fetch("/upscale_stream", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+                signal: controller.signal,
+              });
+              if (!res.ok || !res.body) {
+                const text = await res.text();
+                throw new Error(text || "Failed to start upscale");
+              }
+              const reader = res.body.getReader();
+              const decoder = new TextDecoder();
+              let buffer = "";
+              let finished = false;
+              const data = await new Promise((resolve, reject) => {
+                const handleEvent = (eventName, data) => {
+                  if (eventName === "progress") {
+                    const current = Number(data?.current || 0);
+                    const total = Number(data?.total || 0) || current || 1;
+                    upscaleStepProgress.value = { current, total };
                     return;
                   }
-                  buffer += decoder.decode(value, { stream: true });
-                  const parts = buffer.split("\n\n");
-                  buffer = parts.pop() || "";
-                  for (const chunk of parts) {
-                    const lines = chunk.split("\n");
-                    const eventLine = lines.find((line) => line.startsWith("event:"));
-                    const dataLine = lines.find((line) => line.startsWith("data:"));
-                    if (!eventLine || !dataLine) continue;
-                    const eventName = eventLine.replace("event:", "").trim();
-                    const dataRaw = dataLine.replace("data:", "").trim();
-                    let data;
-                    try {
-                      data = JSON.parse(dataRaw);
-                    } catch (err) {
-                      data = {};
+                  if (eventName === "result") {
+                    const current = upscaleStepProgress.value.current || 1;
+                    const total = upscaleStepProgress.value.total || current || 1;
+                    upscaleStepProgress.value = { current: total, total };
+                    finished = true;
+                    reader.cancel().catch(() => {});
+                    resolve(data);
+                    return;
+                  }
+                  if (eventName === "error") {
+                    finished = true;
+                    reader.cancel().catch(() => {});
+                    reject(new Error(data?.message || "Upscale failed"));
+                  }
+                };
+                const read = () => {
+                  reader.read().then(({ done, value }) => {
+                    if (done) {
+                      if (!finished) {
+                        reject(new Error("Upscale interrupted"));
+                      }
+                      return;
                     }
-                    handleEvent(eventName, data);
+                    buffer += decoder.decode(value, { stream: true });
+                    const parts = buffer.split("\n\n");
+                    buffer = parts.pop() || "";
+                    for (const chunk of parts) {
+                      const lines = chunk.split("\n");
+                      const eventLine = lines.find((line) => line.startsWith("event:"));
+                      const dataLine = lines.find((line) => line.startsWith("data:"));
+                      if (!eventLine || !dataLine) continue;
+                      const eventName = eventLine.replace("event:", "").trim();
+                      const dataRaw = dataLine.replace("data:", "").trim();
+                      let data;
+                      try {
+                        data = JSON.parse(dataRaw);
+                      } catch (err) {
+                        data = {};
+                      }
+                      handleEvent(eventName, data);
                   }
                   read();
                 }).catch((err) => {
-                  cleanup();
+                  finished = true;
+                  reader.cancel().catch(() => {});
                   reject(err);
                 });
               };
               read();
-            }).catch((err) => {
-              if (controller.signal.aborted) {
-                throw new Error(t('upscale.running') + " timeout");
-              }
-              throw err;
             });
+            return data;
+            } catch (err) {
+              const aborted = controller.signal.aborted || /abort|timeout/i.test(err?.message || "");
+              try {
+                return await fallbackUpscaleOnce(payload);
+              } catch (fallbackErr) {
+                if (aborted) {
+                  throw new Error(t('upscale.running') + " timeout");
+                }
+                throw fallbackErr;
+              }
+            } finally {
+              cleanup();
+            }
           };
 
           const upscaleImage = async ({ auto = false, sourceOverride = null } = {}) => {
@@ -2516,7 +2539,6 @@
               width: aligned.width,
             };
 
-            console.log("generate payload", payload);
             const seedVal = overrides.seed ?? seed.value;
             if (seedVal !== "") {
               payload.seed = Number(seedVal);

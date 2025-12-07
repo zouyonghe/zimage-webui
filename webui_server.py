@@ -12,6 +12,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Lock, Thread
 from urllib.parse import urlparse
+from typing import Optional, Tuple
 
 import numpy as np
 import torch
@@ -63,6 +64,33 @@ MAX_UPSCALE_EDGE = 4096
 UPSCALE_MODEL_PATH = Path(os.environ.get("ZIMAGE_UPSCALE_MODEL", ROOT / "weights" / "RealESRGAN_x4plus.pth"))
 UPSCALE_TILE = int(os.environ.get("ZIMAGE_UPSCALE_TILE", 256))
 UPSCALE_TILE_PAD = int(os.environ.get("ZIMAGE_UPSCALE_TILE_PAD", 10))
+
+
+def clamp_resolution(height: int, width: int) -> Tuple[int, int]:
+    """Clamp resolution to configured bounds and grid."""
+    h = int(height)
+    w = int(width)
+    if h < MIN_RESOLUTION:
+        h = DEFAULT_HEIGHT
+    if w < MIN_RESOLUTION:
+        w = DEFAULT_WIDTH
+    h = max(MIN_RESOLUTION, min(h, MAX_RESOLUTION))
+    w = max(MIN_RESOLUTION, min(w, MAX_RESOLUTION))
+    h = (h // RESOLUTION_STEP) * RESOLUTION_STEP
+    w = (w // RESOLUTION_STEP) * RESOLUTION_STEP
+    return h, w
+
+
+def build_generator(device: str, seed: Optional[int]) -> Tuple[torch.Generator, int]:
+    """Create a torch.Generator seeded consistently; returns generator and resolved seed."""
+    gen = torch.Generator(device=device)
+    resolved = int(seed) if seed is not None else int(torch.seed())
+    gen = gen.manual_seed(resolved)
+    return gen, resolved
+
+
+def generation_context(device: str, dtype: torch.dtype):
+    return torch.autocast(device_type="cuda", dtype=dtype) if device == "cuda" else torch.no_grad()
 
 
 _PIPE = None
@@ -209,6 +237,38 @@ class WebUIHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _parse_generate_params(self, payload: dict) -> dict:
+        try:
+            prompt = (payload.get("prompt") or "").strip() or DEFAULT_PROMPT
+            negative_prompt = (payload.get("negative_prompt") or "").strip()
+            steps = int(payload.get("steps", 9))
+            guidance = float(payload.get("guidance", 0.0))
+            height = int(payload.get("height", DEFAULT_HEIGHT))
+            width = int(payload.get("width", DEFAULT_WIDTH))
+            seed = payload.get("seed")
+            if seed is not None:
+                seed = int(seed)
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError(f"Invalid parameter type: {exc}") from exc
+
+        height, width = clamp_resolution(height, width)
+
+        if steps < 1 or steps > MAX_STEPS:
+            raise ValueError(f"steps must be between 1 and {MAX_STEPS}")
+
+        if guidance < MIN_GUIDANCE or guidance > MAX_GUIDANCE:
+            raise ValueError(f"guidance must be between {MIN_GUIDANCE} and {MAX_GUIDANCE}")
+
+        return {
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "steps": steps,
+            "guidance": guidance,
+            "height": height,
+            "width": width,
+            "seed": seed,
+        }
+
     def do_GET(self):  # noqa: N802
         path = urlparse(self.path).path.rstrip("/") or "/"
 
@@ -276,35 +336,9 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             return
 
         try:
-            prompt = (payload.get("prompt") or "").strip() or DEFAULT_PROMPT
-            negative_prompt = (payload.get("negative_prompt") or "").strip()
-            steps = int(payload.get("steps", 9))
-            guidance = float(payload.get("guidance", 0.0))
-            height = int(payload.get("height", DEFAULT_HEIGHT))
-            width = int(payload.get("width", DEFAULT_WIDTH))
-            seed = payload.get("seed")
-            if seed is not None:
-                seed = int(seed)
-        except Exception as exc:  # noqa: BLE001
-            self._send_json(400, {"error": f"Invalid parameter type: {exc}"})
-            return
-
-        # clamp and snap dimensions; if below min, fall back to defaults
-        if height < MIN_RESOLUTION:
-            height = DEFAULT_HEIGHT
-        if width < MIN_RESOLUTION:
-            width = DEFAULT_WIDTH
-        height = max(MIN_RESOLUTION, min(height, MAX_RESOLUTION))
-        width = max(MIN_RESOLUTION, min(width, MAX_RESOLUTION))
-        height = (height // RESOLUTION_STEP) * RESOLUTION_STEP
-        width = (width // RESOLUTION_STEP) * RESOLUTION_STEP
-
-        if steps < 1 or steps > MAX_STEPS:
-            self._send_json(400, {"error": f"steps must be between 1 and {MAX_STEPS}"})
-            return
-
-        if guidance < MIN_GUIDANCE or guidance > MAX_GUIDANCE:
-            self._send_json(400, {"error": f"guidance must be between {MIN_GUIDANCE} and {MAX_GUIDANCE}"})
+            params = self._parse_generate_params(payload)
+        except ValueError as exc:
+            self._send_json(400, {"error": str(exc)})
             return
 
         try:
@@ -313,31 +347,26 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             self._send_json(500, {"error": f"Pipeline init failed: {exc}"})
             return
 
-        generator = torch.Generator(device=device)
-        if seed is not None:
-            try:
-                generator = generator.manual_seed(int(seed))
-            except Exception:  # noqa: BLE001
-                self._send_json(400, {"error": "Seed must be an integer"})
-                return
-        else:
-            seed = torch.seed()
-            generator = generator.manual_seed(int(seed))
+        try:
+            generator, seed = build_generator(device, params["seed"])
+        except Exception as exc:  # noqa: BLE001
+            self._send_json(400, {"error": f"Invalid seed: {exc}"})
+            return
 
         print(
-            f"Generating image | prompt='{prompt}' steps={steps} guidance={guidance} size={width}x{height} seed={seed} device={device}"
+            f"Generating image | prompt='{params['prompt']}' steps={params['steps']} guidance={params['guidance']} size={params['width']}x{params['height']} seed={seed} device={device}"
         )
 
         try:
             with _GEN_LOCK:
-                with torch.autocast(device_type="cuda", dtype=dtype) if device == "cuda" else torch.no_grad():
+                with generation_context(device, dtype):
                     result = pipe(
-                        prompt,
-                        num_inference_steps=steps,
-                        guidance_scale=guidance,
-                        height=height,
-                        width=width,
-                        negative_prompt=negative_prompt or None,
+                        params["prompt"],
+                        num_inference_steps=params["steps"],
+                        guidance_scale=params["guidance"],
+                        height=params["height"],
+                        width=params["width"],
+                        negative_prompt=params["negative_prompt"] or None,
                         generator=generator,
                     )
             image = result.images[0]
@@ -353,7 +382,7 @@ class WebUIHandler(SimpleHTTPRequestHandler):
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename_seed = seed if seed is not None else "rand"
-        file_path = OUTPUT_DIR / f"{timestamp}_{width}x{height}_{filename_seed}.png"
+        file_path = OUTPUT_DIR / f"{timestamp}_{params['width']}x{params['height']}_{filename_seed}.png"
         try:
             image.save(file_path, format="PNG")
         except Exception as exc:  # noqa: BLE001
@@ -363,12 +392,12 @@ class WebUIHandler(SimpleHTTPRequestHandler):
         response = {
             "image": f"data:image/png;base64,{encoded}",
             "meta": {
-                "prompt": prompt,
-                "steps": steps,
-                "guidance": guidance,
-                "height": height,
-                "width": width,
-                "negative_prompt": negative_prompt,
+                "prompt": params["prompt"],
+                "steps": params["steps"],
+                "guidance": params["guidance"],
+                "height": params["height"],
+                "width": params["width"],
+                "negative_prompt": params["negative_prompt"],
                 "seed": seed,
                 "device": device,
                 "dtype": str(dtype),
@@ -621,34 +650,9 @@ class WebUIHandler(SimpleHTTPRequestHandler):
 
     def _handle_generate_stream(self, payload: dict):
         try:
-            prompt = (payload.get("prompt") or "").strip() or DEFAULT_PROMPT
-            negative_prompt = (payload.get("negative_prompt") or "").strip()
-            steps = int(payload.get("steps", 9))
-            guidance = float(payload.get("guidance", 0.0))
-            height = int(payload.get("height", DEFAULT_HEIGHT))
-            width = int(payload.get("width", DEFAULT_WIDTH))
-            seed = payload.get("seed")
-            if seed is not None:
-                seed = int(seed)
-        except Exception as exc:  # noqa: BLE001
-            self._send_json(400, {"error": f"Invalid parameter type: {exc}"})
-            return
-
-        if height < MIN_RESOLUTION:
-            height = DEFAULT_HEIGHT
-        if width < MIN_RESOLUTION:
-            width = DEFAULT_WIDTH
-        height = max(MIN_RESOLUTION, min(height, MAX_RESOLUTION))
-        width = max(MIN_RESOLUTION, min(width, MAX_RESOLUTION))
-        height = (height // RESOLUTION_STEP) * RESOLUTION_STEP
-        width = (width // RESOLUTION_STEP) * RESOLUTION_STEP
-
-        if steps < 1 or steps > MAX_STEPS:
-            self._send_json(400, {"error": f"steps must be between 1 and {MAX_STEPS}"})
-            return
-
-        if guidance < MIN_GUIDANCE or guidance > MAX_GUIDANCE:
-            self._send_json(400, {"error": f"guidance must be between {MIN_GUIDANCE} and {MAX_GUIDANCE}"})
+            params = self._parse_generate_params(payload)
+        except ValueError as exc:
+            self._send_json(400, {"error": str(exc)})
             return
 
         try:
@@ -657,16 +661,11 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             self._send_json(500, {"error": f"Pipeline init failed: {exc}"})
             return
 
-        generator = torch.Generator(device=device)
-        if seed is not None:
-            try:
-                generator = generator.manual_seed(int(seed))
-            except Exception:  # noqa: BLE001
-                self._send_json(400, {"error": "Seed must be an integer"})
-                return
-        else:
-            seed = torch.seed()
-            generator = generator.manual_seed(int(seed))
+        try:
+            generator, seed = build_generator(device, params["seed"])
+        except Exception as exc:  # noqa: BLE001
+            self._send_json(400, {"error": f"Invalid seed: {exc}"})
+            return
 
         # Prepare streaming headers
         self.send_response(200)
@@ -675,10 +674,10 @@ class WebUIHandler(SimpleHTTPRequestHandler):
         self.send_header("Connection", "keep-alive")
         self.end_headers()
 
-        print("[SSE] start /generate_stream", {'seed': seed, 'size': f"{width}x{height}"})
+        print("[SSE] start /generate_stream", {'seed': seed, 'size': f"{params['width']}x{params['height']}"})
 
         print(
-            f"[SSE] Generating image | prompt='{prompt}' steps={steps} guidance={guidance} size={width}x{height} seed={seed} device={device}"
+            f"[SSE] Generating image | prompt='{params['prompt']}' steps={params['steps']} guidance={params['guidance']} size={params['width']}x{params['height']} seed={seed} device={device}"
         )
 
         try:
@@ -692,19 +691,19 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                     # step is zero-based; report human-friendly step count
                     ok = self._send_sse_event(
                         "progress",
-                        {"step": step + 1, "total_steps": steps},
+                        {"step": step + 1, "total_steps": params["steps"]},
                     )
                     if not ok:
                         raise BrokenPipeError()
 
-                with torch.autocast(device_type="cuda", dtype=dtype) if device == "cuda" else torch.no_grad():
+                with generation_context(device, dtype):
                     kwargs = dict(
-                        prompt=prompt,
-                        num_inference_steps=steps,
-                        guidance_scale=guidance,
-                        height=height,
-                        width=width,
-                        negative_prompt=negative_prompt or None,
+                        prompt=params["prompt"],
+                        num_inference_steps=params["steps"],
+                        guidance_scale=params["guidance"],
+                        height=params["height"],
+                        width=params["width"],
+                        negative_prompt=params["negative_prompt"] or None,
                         generator=generator,
                     )
                     if supports_callback:
@@ -713,7 +712,7 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                         kwargs["callback_steps"] = 1
                     else:
                         # Emit a start progress event to indicate fallback mode
-                        self._send_sse_event("progress", {"step": 0, "total_steps": steps, "note": "no_callback"})
+                        self._send_sse_event("progress", {"step": 0, "total_steps": params["steps"], "note": "no_callback"})
                     result = pipe(**kwargs)
             image = result.images[0]
         except BrokenPipeError:
@@ -730,7 +729,7 @@ class WebUIHandler(SimpleHTTPRequestHandler):
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename_seed = seed if seed is not None else "rand"
-        file_path = OUTPUT_DIR / f"{timestamp}_{width}x{height}_{filename_seed}.png"
+        file_path = OUTPUT_DIR / f"{timestamp}_{params['width']}x{params['height']}_{filename_seed}.png"
         try:
             image.save(file_path, format="PNG")
         except Exception as exc:  # noqa: BLE001
@@ -740,12 +739,12 @@ class WebUIHandler(SimpleHTTPRequestHandler):
         payload = {
             "image": f"data:image/png;base64,{encoded}",
             "meta": {
-                "prompt": prompt,
-                "steps": steps,
-                "guidance": guidance,
-                "height": height,
-                "width": width,
-                "negative_prompt": negative_prompt,
+                "prompt": params["prompt"],
+                "steps": params["steps"],
+                "guidance": params["guidance"],
+                "height": params["height"],
+                "width": params["width"],
+                "negative_prompt": params["negative_prompt"],
                 "seed": seed,
                 "device": device,
                 "dtype": str(dtype),

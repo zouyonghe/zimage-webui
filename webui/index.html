@@ -1924,6 +1924,22 @@
             seed.value = Math.floor(Math.random() * 1_000_000);
           };
 
+          const fallbackGenerateOnce = async (payload) => {
+            // 非流式兜底：直接等完整响应，避免 SSE 被中间件/代理切断
+            const res = await fetch("/generate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            if (!res.ok) {
+              const text = await res.text();
+              throw new Error(text || "Fallback generate failed");
+            }
+            const data = await res.json();
+            stepProgress.value = { current: payload.steps || steps.value || 0, total: payload.steps || steps.value || 0 };
+            return data;
+          };
+
           const streamGenerateOnce = async (payload) => {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
@@ -2014,10 +2030,16 @@
             try {
               return await promise;
             } catch (err) {
-              if (controller.signal.aborted) {
-                throw new Error(t('status.generating') + " timeout");
+              clearFakeProgress();
+              // 流式失败兜底走非流式接口，避免批量中断
+              try {
+                return await fallbackGenerateOnce(payload);
+              } catch (fallbackErr) {
+                if (controller.signal.aborted) {
+                  throw new Error(t('status.generating') + " timeout");
+                }
+                throw fallbackErr;
               }
-              throw err;
             }
           };
 

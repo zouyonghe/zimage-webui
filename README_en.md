@@ -1,30 +1,33 @@
 # Z-Image WebUI
 
+Languages: zh / en / ja
+
 Lightweight local Web UI for Z-Image with aspect presets, batch generation, auto-save, hi-res upscale, and magnifier.
 
-## Features
+## Feature Overview
 - Vue SPA with prompt/negative, steps, guidance, seed.
-- Aspect presets (512/768/1024 square + common ratios), inputs snap to 16px, clamped 512–1024.
+- Built-in language switch (Chinese / English / Japanese).
+- Aspect presets (512/768/1024 square + common ratios); inputs snap to 16px and clamp to 512–1024.
 - Batch generate 1–10 images; empty seed = random per image, fixed seed = reproducible.
-- Auto-save to `outputs/` with timestamp/size/seed; `meta.saved_path` returned by API.
-- Hi-res upscale via Real-ESRGAN (1–4x), optional auto-upscale toggle; upscale results and metadata recorded.
+- Auto-save to `outputs/` with timestamp/size/seed; API returns `meta.saved_path`.
+- Preload a random prompt on first load for quick start.
+- Hi-res upscale via Real-ESRGAN (1–4x); button in preview, optional “auto upscale” for subsequent generations; results and metadata recorded.
 - Magnifier toggle in preview (off by default to save performance).
-- UI language switch: zh / en / ja.
 
 ## Requirements
 - Python 3.10+
-- CUDA GPU with matching PyTorch build
-- Z-Image weights under `zimage-model/` (local only)
-- Optional: Real-ESRGAN weight `weights/RealESRGAN_x4plus.pth` (env `ZIMAGE_UPSCALE_MODEL` to override)
+- CUDA GPU (matching PyTorch build)
+- Local Z-Image weights in `zimage-model/` (no network load)
+- Optional: Real-ESRGAN weight `weights/RealESRGAN_x4plus.pth` (override with `ZIMAGE_UPSCALE_MODEL`)
 
 ## Install
 ```bash
-# Install torch/torchvision matching your CUDA (example CUDA 12.1)
+# Install torch/torchvision matching CUDA (example CUDA 12.1)
 # pip install torch==2.5.1+cu121 torchvision==0.20.1 -f https://download.pytorch.org/whl/torch_stable.html
 
 pip install -r requirements.txt
 
-# Download model weights (aria2c required)
+# Download weights (aria2c required): main model to zimage-model/, RealESRGAN_x4plus to weights/
 cd scripts && bash download_models.sh && cd ..
 ```
 
@@ -36,8 +39,20 @@ python webui_server.py
 
 Open `http://localhost:9000` in your browser.
 
-Outputs are saved to `outputs/` like `20240614_153045_768x768_rand.png`.
+Outputs save to `outputs/`, e.g. `20240614_153045_768x768_rand.png`.
+
+## Directory
+- `webui/`: front-end (Vue 3 ESM)
+- `webui_server.py`: HTTP server & generation API
+- `zimage-model/`: model weights
+- `outputs/`: auto-saved images (created on run)
+- Others: `requirements.txt`, helper/test scripts
+- Download script: `scripts/download_models.sh` (uses hf-mirror)
+- CUDA test: `scripts/test_cuda.py`
 
 ## Notes
-- Resolution limits: min 512 / max 1024 / step 16; adjust both `webui/index.html` and `webui_server.py` if you change them.
-- Real-ESRGAN install warning about `tb-nightly` can be ignored; to silence, install `tensorboard` then `pip install realesrgan --no-deps`. Only requirement is your runtime env can `import realesrgan`.
+- Resolution limits: min 512 / max 1024 / step 16; change both `webui/index.html` and `webui_server.py` if needed.
+- Server logs include generation params/errors for debugging.
+- Real-ESRGAN install warning about `tb-nightly` can be ignored; to silence, `pip install tensorboard` then `pip install realesrgan --no-deps`. Just ensure runtime can `import realesrgan`.
+- Hi-res upscale results append to results/history with scale shown; “auto upscale” is off by default.
+- Magnifier toggle lives in the preview toolbar; when off, magnifier is not rendered to save performance.

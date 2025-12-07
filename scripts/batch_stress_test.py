@@ -11,6 +11,7 @@ TOTAL = 10
 
 
 async def main():
+    print(f"Starting batch stream test to {URL}, total={TOTAL}")
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
         page = await browser.new_page(viewport={"width": 1280, "height": 800})
@@ -20,6 +21,7 @@ async def main():
             async (total) => {
               const results = [];
               for (let i = 0; i < total; i += 1) {
+                console.log(`running ${i+1}/${total}`);
                 const seed = Math.floor(Math.random() * 1000000);
                 const payload = {
                   prompt: 'a cat sitting on a chair, high quality, detailed',

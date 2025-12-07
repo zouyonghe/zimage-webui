@@ -2,9 +2,11 @@ import base64
 import io
 import json
 import os
+import re
 import signal
 import sys
 import contextlib
+import inspect
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -184,6 +186,13 @@ class WebUIHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(WEB_DIR), **kwargs)
 
+    def handle(self):  # noqa: D401
+        """Handle a single HTTP request; ignore client resets to avoid noisy traces."""
+        try:
+            super().handle()
+        except ConnectionResetError:
+            return
+
     def _decode_base64_image(self, data_url: str):
         if not data_url:
             raise ValueError("image missing")
@@ -202,12 +211,6 @@ class WebUIHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):  # noqa: N802
         path = urlparse(self.path).path.rstrip("/") or "/"
-
-        if path == "/favicon.ico":
-            self.send_response(204)
-            self.send_header("Content-Length", "0")
-            self.end_headers()
-            return
 
         if path == "/health":
             self._send_json(
@@ -262,8 +265,12 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             self._send_json(400, {"error": f"Invalid request body: {exc}"})
             return
 
+        if path == "/upscale_stream":
+            return self._handle_upscale_stream(payload)
         if path == "/upscale":
             return self._handle_upscale(payload)
+        if path == "/generate_stream":
+            return self._handle_generate_stream(payload)
         if path != "/generate":
             self.send_error(404, "Unsupported endpoint")
             return
@@ -454,11 +461,296 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             },
         )
 
+    def _handle_upscale_stream(self, payload: dict):
+        try:
+            image_b64 = payload.get("image")
+            scale = float(payload.get("scale", 2.0))
+        except Exception as exc:  # noqa: BLE001
+            self._send_json(400, {"error": f"Invalid parameter type: {exc}"})
+            return
+
+        if not image_b64:
+            self._send_json(400, {"error": "image is required"})
+            return
+
+        if scale <= 0:
+            self._send_json(400, {"error": "scale must be positive"})
+            return
+
+        scale = max(1.0, min(scale, MAX_UPSCALE_FACTOR))
+
+        try:
+            decoded = self._decode_base64_image(image_b64)
+            image = Image.open(io.BytesIO(decoded)).convert("RGB")
+        except Exception as exc:  # noqa: BLE001
+            self._send_json(400, {"error": f"Invalid image data: {exc}"})
+            return
+
+        src_w, src_h = image.size
+        target_w = int(src_w * scale)
+        target_h = int(src_h * scale)
+
+        if target_w > MAX_UPSCALE_EDGE or target_h > MAX_UPSCALE_EDGE:
+            aspect = src_w / src_h
+            if aspect >= 1:
+                target_w = MAX_UPSCALE_EDGE
+                target_h = int(target_w / aspect)
+            else:
+                target_h = MAX_UPSCALE_EDGE
+                target_w = int(target_h * aspect)
+            scale = round(target_w / src_w, 2)
+
+        try:
+            upscaler, device = get_upscaler()
+        except Exception as exc:  # noqa: BLE001
+            self._send_json(500, {"error": f"Upscale unavailable: {exc}"})
+            return
+
+        # Prepare streaming headers
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.end_headers()
+
+        def send_error(message: str):
+            try:
+                self._send_sse_event("error", {"message": message})
+            except BrokenPipeError:
+                return
+
+        def send_progress(current: int, total: int):
+            try:
+                self._send_sse_event("progress", {"current": current, "total": total})
+            except BrokenPipeError:
+                raise
+
+        class _TileProgressWriter:
+            def __init__(self, emitter):
+                self.buffer = ""
+                self.emit = emitter
+
+            def write(self, data):  # noqa: D401
+                """Collect stdout/stderr from RealESRGAN and emit tile progress events."""
+                text = str(data).replace("\r", "\n")
+                self.buffer += text
+                while "\n" in self.buffer:
+                    line, self.buffer = self.buffer.split("\n", 1)
+                    self._handle_line(line.strip())
+                return len(str(data))
+
+            def flush(self):
+                if self.buffer:
+                    self._handle_line(self.buffer.strip())
+                    self.buffer = ""
+                return
+
+            def _handle_line(self, line: str):
+                if not line:
+                    return
+                m = re.search(r"Tile\s+(\d+)/(\d+)", line, re.IGNORECASE)
+                if m:
+                    try:
+                        current = int(m.group(1))
+                        total = int(m.group(2))
+                        self.emit(current, total)
+                    except Exception:
+                        return
+
+        try:
+            buffer = io.BytesIO()
+            writer = _TileProgressWriter(send_progress)
+            with contextlib.redirect_stdout(writer), contextlib.redirect_stderr(writer):
+                img_np = np.array(image)[:, :, ::-1]
+                output, _ = upscaler.enhance(img_np, outscale=scale)
+            upscaled = Image.fromarray(output[:, :, ::-1])
+            upscaled.save(buffer, format="PNG")
+            encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+        except BrokenPipeError:
+            return
+        except Exception as exc:  # noqa: BLE001
+            send_error(f"Upscale failed: {exc}")
+            return
+
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_path = OUTPUT_DIR / f"upscaled_{timestamp}_{target_w}x{target_h}.png"
+        try:
+            upscaled.save(file_path, format="PNG")
+        except Exception as exc:  # noqa: BLE001
+            print(f"Failed to save upscaled image: {exc}")
+            file_path = None
+
+        try:
+            self._send_sse_event(
+                "result",
+                {
+                    "image": f"data:image/png;base64,{encoded}",
+                    "meta": {
+                        "type": "upscale",
+                        "source_width": src_w,
+                        "source_height": src_h,
+                        "width": target_w,
+                        "height": target_h,
+                        "applied_scale": scale,
+                        "saved_path": str(file_path) if file_path else None,
+                    },
+                },
+            )
+            self._send_sse_event("done", {"ok": True})
+        except BrokenPipeError:
+            return
     def log_message(self, fmt, *args):  # noqa: D401,N802
         """Silence noisy health polling logs."""
         if getattr(self, "path", "").startswith("/health"):
             return
         return super().log_message(fmt, *args)
+
+    # ==== Streaming generation with progress ====
+    def _send_sse_event(self, event: str, data: dict) -> bool:
+        try:
+            message = f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+            self.wfile.write(message.encode("utf-8"))
+            self.wfile.flush()
+            return True
+        except BrokenPipeError:
+            return False
+        except Exception as exc:  # noqa: BLE001
+            print(f"SSE send error: {exc}")
+            return False
+
+    def _handle_generate_stream(self, payload: dict):
+        try:
+            prompt = (payload.get("prompt") or "").strip() or DEFAULT_PROMPT
+            negative_prompt = (payload.get("negative_prompt") or "").strip()
+            steps = int(payload.get("steps", 9))
+            guidance = float(payload.get("guidance", 0.0))
+            height = int(payload.get("height", DEFAULT_HEIGHT))
+            width = int(payload.get("width", DEFAULT_WIDTH))
+            seed = payload.get("seed")
+            if seed is not None:
+                seed = int(seed)
+        except Exception as exc:  # noqa: BLE001
+            self._send_json(400, {"error": f"Invalid parameter type: {exc}"})
+            return
+
+        if height < MIN_RESOLUTION:
+            height = DEFAULT_HEIGHT
+        if width < MIN_RESOLUTION:
+            width = DEFAULT_WIDTH
+        height = max(MIN_RESOLUTION, min(height, MAX_RESOLUTION))
+        width = max(MIN_RESOLUTION, min(width, MAX_RESOLUTION))
+        height = (height // RESOLUTION_STEP) * RESOLUTION_STEP
+        width = (width // RESOLUTION_STEP) * RESOLUTION_STEP
+
+        if steps < 1 or steps > MAX_STEPS:
+            self._send_json(400, {"error": f"steps must be between 1 and {MAX_STEPS}"})
+            return
+
+        if guidance < MIN_GUIDANCE or guidance > MAX_GUIDANCE:
+            self._send_json(400, {"error": f"guidance must be between {MIN_GUIDANCE} and {MAX_GUIDANCE}"})
+            return
+
+        try:
+            pipe, device, dtype = get_pipeline()
+        except Exception as exc:  # noqa: BLE001
+            self._send_json(500, {"error": f"Pipeline init failed: {exc}"})
+            return
+
+        generator = torch.Generator(device=device)
+        if seed is not None:
+            try:
+                generator = generator.manual_seed(int(seed))
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "Seed must be an integer"})
+                return
+        else:
+            seed = torch.seed()
+            generator = generator.manual_seed(int(seed))
+
+        # Prepare streaming headers
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.end_headers()
+
+        print(
+            f"[SSE] Generating image | prompt='{prompt}' steps={steps} guidance={guidance} size={width}x{height} seed={seed} device={device}"
+        )
+
+        try:
+            with _GEN_LOCK:
+                # Check if pipeline supports callback; fallback to no per-step progress if not.
+                pipe_signature = inspect.signature(pipe.__call__)
+                supports_callback = "callback" in pipe_signature.parameters
+                supports_callback_steps = "callback_steps" in pipe_signature.parameters
+
+                def progress_callback(step: int, _timestep, _latents):
+                    # step is zero-based; report human-friendly step count
+                    ok = self._send_sse_event(
+                        "progress",
+                        {"step": step + 1, "total_steps": steps},
+                    )
+                    if not ok:
+                        raise BrokenPipeError()
+
+                with torch.autocast(device_type="cuda", dtype=dtype) if device == "cuda" else torch.no_grad():
+                    kwargs = dict(
+                        prompt=prompt,
+                        num_inference_steps=steps,
+                        guidance_scale=guidance,
+                        height=height,
+                        width=width,
+                        negative_prompt=negative_prompt or None,
+                        generator=generator,
+                    )
+                    if supports_callback:
+                        kwargs["callback"] = progress_callback
+                    if supports_callback_steps:
+                        kwargs["callback_steps"] = 1
+                    else:
+                        # Emit a start progress event to indicate fallback mode
+                        self._send_sse_event("progress", {"step": 0, "total_steps": steps, "note": "no_callback"})
+                    result = pipe(**kwargs)
+            image = result.images[0]
+        except BrokenPipeError:
+            print("[SSE] Client disconnected during generation.")
+            return
+        except Exception as exc:  # noqa: BLE001
+            self._send_sse_event("error", {"error": f"Generation failed: {exc}"})
+            return
+
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename_seed = seed if seed is not None else "rand"
+        file_path = OUTPUT_DIR / f"{timestamp}_{width}x{height}_{filename_seed}.png"
+        try:
+            image.save(file_path, format="PNG")
+        except Exception as exc:  # noqa: BLE001
+            print(f"Failed to save image to disk: {exc}")
+            file_path = None
+
+        payload = {
+            "image": f"data:image/png;base64,{encoded}",
+            "meta": {
+                "prompt": prompt,
+                "steps": steps,
+                "guidance": guidance,
+                "height": height,
+                "width": width,
+                "negative_prompt": negative_prompt,
+                "seed": seed,
+                "device": device,
+                "dtype": str(dtype),
+                "saved_path": str(file_path) if file_path else None,
+            },
+        }
+        self._send_sse_event("complete", payload)
 
 
 def run_server():

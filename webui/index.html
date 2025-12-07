@@ -4,7 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Z-Image WebUI</title>
-    <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/246097416?s=48&v=4" />
+    <link rel="icon" type="image/png" href="./favicon.png?v=3" sizes="256x256" id="app-favicon" />
+    <link rel="icon" type="image/x-icon" href="./favicon.ico?v=1" />
+    <link rel="stylesheet" href="https://unpkg.com/element-plus@2.8.4/dist/index.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js",
+          "element-plus": "https://unpkg.com/element-plus@2.8.4/dist/index.full.mjs"
+        }
+      }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -68,12 +78,10 @@
       }
 
       .logo {
-        width: 44px;
-        height: 44px;
+        width: 48px;
+        height: 48px;
         border-radius: 12px;
-        border: 1px solid var(--panel-strong);
-        object-fit: cover;
-        background: var(--panel);
+        object-fit: contain;
       }
 
       h1 {
@@ -126,6 +134,18 @@
         font-size: 14px;
         transition: border-color 0.15s ease, transform 0.15s ease;
         outline: none;
+      }
+
+      /* Make dropdown options readable across themes */
+      select,
+      .theme-switch select {
+        background: var(--panel);
+        color: var(--text);
+      }
+
+      select option {
+        background: var(--bg-base);
+        color: var(--text);
       }
 
       input:focus,
@@ -224,6 +244,31 @@
         color: var(--muted);
       }
 
+      .progress {
+        margin-top: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .progress .loader-small {
+        flex: 0 0 auto;
+      }
+
+      .progress-bar {
+        flex: 1;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--panel-strong);
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        transition: width 0.2s ease;
+      }
+
       .status.error {
         color: var(--danger);
       }
@@ -236,6 +281,19 @@
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: 10px;
+      }
+
+      .results-card-flex {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .results-scroll-container {
+        flex-grow: 1; /* Make it take up available vertical space */
+        min-height: 0; /* Prevent flex overflow with scrollable content */
+        overflow-y: auto;
+        padding-right: 10px; /* For scrollbar space */
+        margin-top: 12px; /* To separate from the card header */
       }
 
       .thumb {
@@ -261,9 +319,11 @@
         bottom: 8px;
         padding: 4px 8px;
         border-radius: 999px;
-        background: rgba(0, 0, 0, 0.4);
+        background: rgba(51, 65, 85, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.2);
         font-size: 12px;
-        color: var(--text);
+        color: #fff;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.45);
       }
 
       .thumb .thumb-close {
@@ -300,6 +360,15 @@
         height: 52px;
         border-radius: 50%;
         border: 4px solid var(--panel-strong);
+        border-top-color: var(--accent);
+        animation: spin 0.8s linear infinite;
+      }
+
+      .loader-small {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 3px solid var(--panel-strong);
         border-top-color: var(--accent);
         animation: spin 0.8s linear infinite;
       }
@@ -354,7 +423,31 @@
       .history-list {
         display: grid;
         gap: 10px;
-        max-height: 520px;
+      }
+
+      .thumb-info {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        bottom: 8px;
+        padding: 8px;
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        color: #fff;
+        font-size: 12px;
+        line-height: 1.4;
+        display: grid;
+        gap: 2px;
+      }
+
+      .corner-progress {
+        display: grid;
+        gap: 6px;
+        width: 200px;
+      }
+
+      .card-scroll {
         overflow: auto;
       }
 
@@ -413,6 +506,7 @@
         align-items: center;
         gap: 10px;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+        min-width: 220px;
       }
 
       .dot {
@@ -459,6 +553,7 @@
         display: grid;
         gap: 12px;
         box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+        position: relative;
       }
 
       .preview-body img {
@@ -493,6 +588,8 @@
         border-radius: 12px;
         padding: 4px;
         gap: 4px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
       }
 
       .lang-btn {
@@ -505,6 +602,8 @@
         color: var(--muted);
         cursor: pointer;
         transition: all 0.2s ease;
+        flex: 0 0 auto;
+        white-space: nowrap;
       }
 
       .lang-btn.active {
@@ -518,22 +617,122 @@
       }
 
       .theme-switch {
+        position: relative;
+        display: inline-flex;
+      }
+
+      .theme-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 10px;
+        background: var(--bg-base);
+        border: 1px solid var(--panel-strong);
+        border-radius: 14px;
+        color: var(--text);
+        cursor: pointer;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2);
+        transition: transform 0.12s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        min-width: 120px;
+        width: auto;
+      }
+
+      .theme-trigger:hover {
+        transform: translateY(-1px);
+        border-color: var(--accent);
+        box-shadow: 0 14px 32px rgba(0, 0, 0, 0.25);
+      }
+
+      .theme-trigger .theme-dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 1px solid var(--panel-strong);
+        box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
+      }
+
+      .theme-trigger .theme-text {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        flex: 1;
+        text-align: center;
+      }
+
+      .theme-trigger small {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .theme-trigger strong {
+        font-size: 14px;
+        letter-spacing: 0.2px;
+      }
+
+      .theme-trigger .caret {
+        opacity: 0.7;
+        font-size: 14px;
+        transition: transform 0.2s ease, opacity 0.2s ease;
+      }
+
+      .theme-switch.open .theme-trigger .caret {
+        transform: rotate(180deg);
+      }
+
+      .theme-dropdown {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 8px);
+        width: 100%;
+        background: var(--bg-base);
+        border: 1px solid var(--panel-strong);
+        border-radius: 14px;
+        box-shadow: var(--shadow);
+        padding: 8px;
+        display: grid;
+        gap: 6px;
+        z-index: 10;
+      }
+
+      .theme-option {
         display: flex;
         align-items: center;
         gap: 8px;
-        background: var(--panel);
+        padding: 8px 10px;
+        border-radius: 10px;
         border: 1px solid var(--panel-strong);
-        border-radius: 12px;
-        padding: 6px 10px;
+        cursor: pointer;
+        transition: transform 0.1s ease, border-color 0.2s ease, background 0.2s ease;
+        width: 100%;
       }
 
-      .theme-switch select {
-        border: none;
-        background: transparent;
-        padding-left: 2px;
-        width: auto;
-        min-width: 150px;
+      .theme-option:hover {
+        transform: translateY(-1px);
+        border-color: var(--accent);
+        background: var(--panel-soft);
+      }
+
+      .theme-option.active {
+        border-color: var(--accent);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+      }
+
+      .theme-swatch {
+        width: 38px;
+        height: 26px;
+        border-radius: 8px;
+        border: 1px solid var(--panel-strong);
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+        margin-left: auto;
+      }
+
+      .theme-name {
+        font-weight: 600;
+        font-size: 14px;
         color: var(--text);
+        flex: 1;
+        text-align: center;
       }
 
       .upscale-range {
@@ -609,20 +808,31 @@
     <div id="app" v-cloak>
       <header>
         <div style="display: flex; align-items: center; gap: 12px">
-          <img class="logo" src="https://avatars.githubusercontent.com/u/246097416?s=48&v=4" alt="Z-Image Logo" />
+          <img class="logo" src="./favicon.png" alt="Z-Image Logo" />
           <h1>Z-Image WebUI</h1>
-          <div style="color: var(--muted); margin-top: 4px">
-            {{ t('header.subtitle') }}
-          </div>
         </div>
         <div style="display: flex; align-items: center; gap: 12px">
-          <div class="theme-switch">
-            <span style="color: var(--muted); font-size: 14px;">{{ t('theme.label') }}</span>
-            <select v-model="activeTheme">
-              <option v-for="theme in themeOptions" :key="theme.key" :value="theme.key">
-                {{ t(theme.labelKey) }}
-              </option>
-            </select>
+          <div class="theme-switch" ref="themeSwitchRef" :class="{ open: themeMenuOpen }">
+            <button class="theme-trigger" type="button" @click.stop="toggleThemeMenu">
+              <span class="theme-dot" :style="activeThemeSwatch"></span>
+              <div class="theme-text">
+                <small>{{ t('theme.label') }}</small>
+                <strong>{{ activeThemeLabel }}</strong>
+              </div>
+              <span class="caret">v</span>
+            </button>
+            <div class="theme-dropdown" v-if="themeMenuOpen" :style="{ width: themeControlWidth, minWidth: themeControlWidth }">
+              <div
+                class="theme-option"
+                v-for="theme in themeOptions"
+                :key="theme.key"
+                :class="{ active: activeTheme === theme.key }"
+                @click.stop="selectTheme(theme.key)"
+              >
+                <div class="theme-swatch" :style="getThemeSwatch(theme.key)"></div>
+                <div class="theme-name">{{ t(theme.labelKey) }}</div>
+              </div>
+            </div>
           </div>
           <div class="language-switch">
             <button
@@ -651,7 +861,7 @@
       </header>
 
       <main class="layout">
-      <section class="card">
+      <section class="card" ref="promptCardRef">
         <h2>{{ t('prompt.title') }}</h2>
         <label for="prompt">{{ t('prompt.title') }}</label>
         <textarea
@@ -794,46 +1004,42 @@
           <button class="secondary" :disabled="!image || loading || batchRunning" @click="downloadImage">{{ t('save.button') }}</button>
         </div>
 
-        <div class="status" :class="{'error': error || modelError, 'success': successMsg}">
-          <span v-if="error">⚠ {{ error }}</span>
-          <span v-else-if="successMsg">✅ {{ t('status.completed') }}</span>
-          <span v-else>{{ statusLabel }}</span>
-        </div>
-
-      <div class="meta" v-if="meta">
-        <div class="pill">{{ t('meta.device') }}: {{ meta.device }}</div>
-        <div class="pill">{{ t('meta.steps') }}: {{ meta.steps }}</div>
-        <div class="pill">{{ t('meta.guidance') }}: {{ meta.guidance }}</div>
-        <div class="pill">{{ t('meta.size') }}: {{ meta.width }} × {{ meta.height }}</div>
-        <div class="pill" v-if="meta.negative_prompt">{{ t('meta.negative') }}: {{ meta.negative_prompt }}</div>
-        <div class="pill" v-if="meta.seed !== null">{{ t('meta.seed') }}: {{ meta.seed }}</div>
-        <div class="pill" v-if="meta.scale">{{ t('meta.scale') }}: {{ meta.scale }}×</div>
-      </div>
+      <!-- meta pills removed per request -->
       </section>
 
-      <section class="card">
-        <h2>{{ t('results.title') }}</h2>
-        <div v-if="results.length" class="image-grid">
+      <section class="card card-scroll results-card-flex" :style="syncedCardStyle">
+        <div style="display:flex; align-items:center; gap:10px; justify-content: space-between; flex-wrap: wrap;">
+          <h2 style="margin:0;">{{ t('results.title') }}</h2>
+        </div>
+        <div class="results-scroll-container">
+          <div v-if="results.length" class="image-grid">
+            <div
+              class="thumb"
+              v-for="(item, idx) in results"
+              :key="item.id"
+              @click="openPreview(idx)"
+            >
+              <button class="thumb-close" @click.stop="deleteResult(item.id)">×</button>
+              <img :src="item.image" :alt="`${t('results.title')} ${idx + 1}`" />
+              <div class="tag">{{ item.meta.width }}×{{ item.meta.height }}</div>
+            </div>
+          </div>
+          <div v-else class="placeholder">
+            {{ t('results.placeholder') }}
+          </div>
           <div
-            class="thumb"
-            v-for="(item, idx) in results"
-            :key="item.id"
-            @click="openPreview(idx)"
+            v-if="loading || batchRunning || upscaleLoading"
+            style="margin-top: 12px; display: grid; place-items: center; gap: 6px;"
           >
-            <button class="thumb-close" @click.stop="deleteResult(item.id)">×</button>
-            <img :src="item.image" :alt="`${t('results.title')} ${idx + 1}`" />
-            <div class="tag">{{ item.meta.width }}×{{ item.meta.height }}</div>
+            <div class="loader"></div>
+            <div class="status" style="margin:0; text-align:center;">
+              {{ upscaleProgressLabel || imageProgressLabel || statusLabel }}
+            </div>
           </div>
         </div>
-        <div v-else class="placeholder">
-          {{ t('results.placeholder') }}
-        </div>
-        <div v-if="loading" style="margin-top: 12px; display: flex; justify-content: center;">
-          <div class="loader"></div>
-        </div>
       </section>
 
-      <section class="card">
+      <section class="card card-scroll" :style="syncedCardStyle">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <h2>{{ t('history.title') }}</h2>
           <button class="secondary" :disabled="history.length === 0" @click="clearHistory">{{ t('history.clear') }}</button>
@@ -865,10 +1071,18 @@
           </div>
         </div>
       </section>
-      <div class="corner-status">
-        <div class="dot" :style="{ background: statusTone }"></div>
-        <div>{{ statusLabel }}</div>
-      </div>
+        <div class="corner-status">
+          <div class="dot" :style="{ background: statusTone }"></div>
+          <div style="display:grid; gap:6px; min-width: 180px;">
+            <div>{{ statusLabel }}</div>
+            <div class="corner-progress" v-if="overallProgressActive">
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: overallProgressPercent + '%' }"></div>
+              </div>
+              <div style="font-size:12px; color: var(--muted); text-align:right;">{{ overallProgressLabel }}</div>
+            </div>
+          </div>
+        </div>
 
       <div v-if="previewOpen" class="preview-overlay" @click.self="closePreview" @wheel.prevent="onPreviewWheel">
           <div class="preview-body" @wheel.prevent="onPreviewWheel">
@@ -880,6 +1094,18 @@
             @click.left.stop="nextImage"
             @contextmenu.prevent.stop="prevImage"
           />
+          <div
+            class="thumb-info"
+            v-if="showInfoOverlay && currentPreviewItem"
+            style="max-width: 340px; top: 12px; right: 12px; left: auto; bottom: auto;"
+          >
+            <div>{{ t('meta.size') }}: {{ currentPreviewItem.meta?.width }}×{{ currentPreviewItem.meta?.height }}</div>
+            <div>{{ t('meta.steps') }}: {{ currentPreviewItem.meta?.steps ?? steps }}</div>
+            <div>{{ t('meta.guidance') }}: {{ currentPreviewItem.meta?.guidance ?? guidance }}</div>
+            <div>{{ t('meta.seed') }}: {{ currentPreviewItem.meta?.seed ?? t('seed.placeholder') }}</div>
+            <div v-if="currentPreviewItem.meta?.prompt">{{ t('prompt.title_simple') }}: {{ currentPreviewItem.meta.prompt }}</div>
+            <div v-if="currentPreviewItem.meta?.negative_prompt">{{ t('negative.title') }}: {{ currentPreviewItem.meta.negative_prompt }}</div>
+          </div>
           <div class="preview-actions">
             <div class="nav-buttons">
               <button class="secondary" @click.stop="prevImage" :disabled="!hasPrev">{{ t('preview.previous') }}</button>
@@ -888,12 +1114,20 @@
             <div style="display:flex; gap:8px; margin-left:auto;">
               <button
                 class="secondary"
+                :class="{ 'auto-upscale-active': showInfoOverlay }"
+                style="padding: 10px 12px; min-width: 100px;"
+                @click.stop="showInfoOverlay = !showInfoOverlay"
+              >
+                {{ t('preview.info') }}
+              </button>
+              <button
+                class="secondary"
                 :class="{ 'auto-upscale-active': magnifierEnabled }"
                 @click.stop="toggleMagnifier"
               >
                 {{ t('preview.magnifier') }}
               </button>
-              <button class="secondary" :disabled="!canUpscale || upscaleLoading" @click.stop="upscaleImage">
+              <button class="secondary" :disabled="!canUpscale || upscaleLoading" @click.stop="() => upscaleImage({ auto: true })">
                 {{ upscaleLoading ? t('upscale.running') : t('upscale.button') }}
               </button>
               <div class="status" style="margin:0;" :class="{'error': upscaleError}">
@@ -914,16 +1148,18 @@
     </div>
 
     <script type="module">
-      import { createApp, ref, computed, onMounted, watch } from "https://unpkg.com/vue@3/dist/vue.esm-browser.js";
+      import { createApp, ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
+      import ElementPlus from "element-plus";
 
       const DEFAULT_PROMPT = "a cat sitting on a chair, high quality, detailed";
+      const STREAM_TIMEOUT_MS = 10000; // 10 seconds per stream request
 
       createApp({
         setup() {
           // 翻译数据
           const translations = {
             zh: {
-              'header.subtitle': '输入提示词，在线生成高质量图片',
+              'header.subtitle': '在线生成高质量图片',
               'prompt.title': '提示词与参数',
               'prompt.title_simple': '提示词',
               'prompt.placeholder': '描述你想生成的画面...',
@@ -955,6 +1191,7 @@
               'preview.download': '下载图片',
               'preview.close': '关闭',
               'preview.magnifier': '放大镜',
+              'preview.info': '显示信息',
               'upscale.title': '高分辨率放大',
               'upscale.scale': '高分放大倍率',
               'upscale.button': '高分放大',
@@ -964,7 +1201,7 @@
               'status.ready': '已就绪',
               'status.loading': '模型加载中...',
               'status.generating': '正在生成...',
-              'status.batchGenerating': '连续生成中',
+              'status.batchGenerating': '正在生成...',
               'status.stopRequested': '已请求停止，当前图片完成后终止',
               'status.loadFailed': '加载失败',
               'status.completed': '生成完成',
@@ -982,15 +1219,15 @@
               'history.seed': '种子',
               'history.size': '尺寸',
               'history.negative': '负面',
-              'theme.label': '主题',
-              'theme.midnight': '夜间·深蓝',
-              'theme.dawn': '白天·晨光',
-              'theme.sunset': '夜间·落日',
-              'theme.glacier': '白天·冰蓝',
-              'theme.forest': '夜间·森野'
+            'theme.label': '主题',
+              'theme.midnight': '深蓝',
+              'theme.dawn': '晨光',
+              'theme.sunset': '落日',
+              'theme.glacier': '冰蓝',
+              'theme.forest': '森野'
             },
             en: {
-              'header.subtitle': 'Enter prompts to generate high-quality images online',
+              'header.subtitle': 'Generate high-quality images online',
               'prompt.title': 'Prompt & Parameters',
               'prompt.title_simple': 'Prompt',
               'prompt.placeholder': 'Describe the image you want to generate...',
@@ -1022,6 +1259,7 @@
               'preview.download': 'Download Image',
               'preview.close': 'Close',
               'preview.magnifier': 'Magnifier',
+              'preview.info': 'Show info',
               'upscale.title': 'High-Res Upscale',
               'upscale.scale': 'Hi-Res Scale',
               'upscale.button': 'Hi-Res Upscale',
@@ -1031,7 +1269,7 @@
               'status.ready': 'Ready',
               'status.loading': 'Model loading...',
               'status.generating': 'Generating...',
-              'status.batchGenerating': 'Batch generating',
+              'status.batchGenerating': 'Generating...',
               'status.stopRequested': 'Stop requested; will halt after current image',
               'status.loadFailed': 'Load failed',
               'status.completed': 'Generation completed',
@@ -1057,7 +1295,7 @@
               'theme.forest': 'Forest (Dark)'
             },
             ja: {
-              'header.subtitle': 'プロンプトを入力して高品質な画像を生成',
+              'header.subtitle': '高品質な画像をオンライン生成',
               'prompt.title': 'プロンプトとパラメータ',
               'prompt.title_simple': 'プロンプト',
               'prompt.placeholder': '生成したい画像を説明してください...',
@@ -1089,6 +1327,7 @@
               'preview.download': '画像をダウンロード',
               'preview.close': '閉じる',
               'preview.magnifier': 'ルーペ',
+              'preview.info': '情報表示',
               'upscale.title': '高解像度アップスケール',
               'upscale.scale': '高解像度倍率',
               'upscale.button': '高解像度アップスケール',
@@ -1098,7 +1337,7 @@
               'status.ready': '準備完了',
               'status.loading': 'モデル読み込み中...',
               'status.generating': '生成中...',
-              'status.batchGenerating': '連続生成中',
+              'status.batchGenerating': '生成中...',
               'status.stopRequested': '停止をリクエストしました。現在の画像が終わったら停止',
               'status.loadFailed': '読み込み失敗',
               'status.completed': '生成完了',
@@ -1221,30 +1460,21 @@
               },
             },
           };
-          const themeOptions = [
-            { key: "midnight", labelKey: "theme.midnight" },
-            { key: "dawn", labelKey: "theme.dawn" },
-            { key: "sunset", labelKey: "theme.sunset" },
-            { key: "glacier", labelKey: "theme.glacier" },
-            { key: "forest", labelKey: "theme.forest" },
-          ];
-          const activeTheme = ref(localStorage.getItem('zimage-theme') || 'midnight');
-          const applyTheme = (key) => {
-            const theme = themes[key] || themes.midnight;
-            Object.entries(theme.vars).forEach(([name, value]) => {
-              document.documentElement.style.setProperty(`--${name}`, value);
-            });
-            document.documentElement.setAttribute("data-theme", key);
-            document.documentElement.style.colorScheme = theme.mode === "light" ? "light" : "dark";
-          };
-          watch(
-            activeTheme,
-            (key) => {
-              applyTheme(key);
-              localStorage.setItem('zimage-theme', key);
-            },
-            { immediate: true }
-          );
+      const applyTheme = (key) => {
+        const theme = themes[key] || themes.midnight;
+        Object.entries(theme.vars).forEach(([name, value]) => {
+          document.documentElement.style.setProperty(`--${name}`, value);
+        });
+        document.documentElement.setAttribute("data-theme", key);
+        document.documentElement.style.colorScheme = theme.mode === "light" ? "light" : "dark";
+        const icon = document.querySelector('link#app-favicon');
+        if (icon) {
+          const url = new URL(icon.href, window.location.href);
+          // bump cache buster to force reload if needed
+          url.searchParams.set("t", Date.now().toString(36));
+          icon.href = url.pathname + url.search;
+        }
+      };
           const prompt = ref(DEFAULT_PROMPT);
           const negativePrompt = ref("");
           const steps = ref(9);
@@ -1261,6 +1491,7 @@
           const modelLoading = ref(true);
           const modelError = ref("");
           const error = ref("");
+          const stepProgress = ref({ current: 0, total: 0 });
           const meta = ref(null);
           const results = ref([]);
           const image = ref("");
@@ -1276,13 +1507,96 @@
           const magnifierEnabled = ref(false);
           let magnifierRAF = null;
           let magnifierPending = null;
+          const promptCardRef = ref(null);
+          const syncedCardHeight = ref(0);
+          let promptResizeObserver = null;
+          const computeAvailableHeight = () => {
+            const viewport = window.innerHeight || document.documentElement.clientHeight || 0;
+            // Leave room for header/padding; never let cards shrink too small
+            return Math.max(360, viewport - 180);
+          };
+          const totalWorkUnits = ref(0);
+          const completedWorkUnits = ref(0);
+          const currentWorkPhase = ref("");
+          const finalizeWork = () => {
+            if (totalWorkUnits.value <= 0) return;
+            completedWorkUnits.value = Math.max(completedWorkUnits.value, totalWorkUnits.value);
+            totalWorkUnits.value = 0;
+            currentWorkPhase.value = "";
+          };
+          const showInfoOverlay = ref(false);
+          const syncCardHeight = () => {
+            const fallback = computeAvailableHeight();
+            if (!promptCardRef.value) {
+              syncedCardHeight.value = fallback;
+              return;
+            }
+            const rect = promptCardRef.value.getBoundingClientRect();
+            const style = window.getComputedStyle(promptCardRef.value);
+            const margins =
+              parseFloat(style.marginTop || "0") + parseFloat(style.marginBottom || "0");
+            const h = rect.height + margins;
+            syncedCardHeight.value = h || fallback;
+          };
+          const syncCardHeightSoft = () => {
+            // Schedule a few extra syncs to catch late layout changes (fonts, async Vue mount)
+            syncCardHeight();
+            let count = 0;
+            const maxTicks = 6;
+            const tick = () => {
+              if (count >= maxTicks) return;
+              count += 1;
+              syncCardHeight();
+              requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+          };
+          watch(
+            promptCardRef,
+            (el, prev) => {
+              if (promptResizeObserver && prev) {
+                promptResizeObserver.unobserve(prev);
+              }
+              if (promptResizeObserver && el) {
+                promptResizeObserver.observe(el);
+              }
+              nextTick(syncCardHeight);
+            },
+            { immediate: true }
+          );
+          const syncedCardStyle = computed(() => {
+            const available = computeAvailableHeight();
+            const measured = syncedCardHeight.value;
+            const base = measured > 0 ? measured : available;
+            return {
+              height: `${base}px`,
+              overflow: "auto"
+            };
+          });
           const upscaleScale = ref(2.0);
           const upscaleLoading = ref(false);
           const upscaleError = ref("");
+          const upscaleStepProgress = ref({ current: 0, total: 0 });
           const autoUpscaleEnabled = ref(false);
           const lastAutoBaseId = ref("");
           const history = ref([]);
           const selectedRatio = ref("1:1 512");
+          let fakeProgressTimer = null;
+          const clearFakeProgress = () => {
+            if (fakeProgressTimer) {
+              clearInterval(fakeProgressTimer);
+              fakeProgressTimer = null;
+            }
+          };
+          const startFakeProgress = (targetSteps) => {
+            clearFakeProgress();
+            const total = targetSteps || steps.value || 10;
+            let current = 0;
+            fakeProgressTimer = setInterval(() => {
+              current = Math.min(total * 0.9, (stepProgress.value.current || 0) + 1);
+              stepProgress.value = { current, total };
+            }, 500);
+          };
           
           // 语言相关状态
           const currentLang = ref(localStorage.getItem('zimage-lang') || 'zh');
@@ -1298,13 +1612,126 @@
             localStorage.setItem('zimage-lang', lang);
           };
 
+          const themeOptions = [
+            { key: "midnight", labelKey: "theme.midnight" },
+            { key: "dawn", labelKey: "theme.dawn" },
+            { key: "sunset", labelKey: "theme.sunset" },
+            { key: "glacier", labelKey: "theme.glacier" },
+            { key: "forest", labelKey: "theme.forest" },
+          ];
+          const activeTheme = ref(localStorage.getItem('zimage-theme') || 'midnight');
+          const themeMenuOpen = ref(false);
+          const themeSwitchRef = ref(null);
+          const themeControlWidth = ref('auto');
+          const syncThemeWidth = () => {
+            const el = themeSwitchRef.value;
+            if (!el) return;
+            const btn = el.querySelector('.theme-trigger');
+            const width = (btn && btn.offsetWidth) || el.offsetWidth;
+            if (width) {
+              themeControlWidth.value = `${width}px`;
+            }
+          };
+          const getThemeSwatch = (key) => {
+            const theme = themes[key];
+            if (!theme) return {};
+            const accent = theme.vars.accent;
+            const accent2 = theme.vars["accent-2"] || accent;
+            return { background: `linear-gradient(135deg, ${accent}, ${accent2})` };
+          };
+          const activeThemeSwatch = computed(() => getThemeSwatch(activeTheme.value));
+          const activeThemeLabel = computed(() => {
+            const match = themeOptions.find((item) => item.key === activeTheme.value);
+            return match ? t(match.labelKey) : t('theme.label');
+          });
+          const toggleThemeMenu = () => {
+            themeMenuOpen.value = !themeMenuOpen.value;
+            nextTick(syncThemeWidth);
+          };
+          const closeThemeMenu = () => {
+            themeMenuOpen.value = false;
+          };
+          const selectTheme = (key) => {
+            activeTheme.value = key;
+            closeThemeMenu();
+          };
+          const handleClickOutside = (event) => {
+            if (!themeSwitchRef.value) return;
+            if (!themeSwitchRef.value.contains(event.target)) {
+              closeThemeMenu();
+            }
+          };
           // 同步页面 lang 属性，便于切换语种
           watch(
             currentLang,
             (lang) => {
               document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+              nextTick(syncThemeWidth);
+              nextTick(syncCardHeight);
             },
             { immediate: true }
+          );
+          watch(
+            activeThemeLabel,
+            () => nextTick(syncThemeWidth)
+          );
+          onMounted(() => {
+            document.addEventListener('click', handleClickOutside);
+            nextTick(syncThemeWidth);
+            window.addEventListener('resize', syncThemeWidth);
+            nextTick(syncCardHeightSoft);
+            window.addEventListener('resize', syncCardHeightSoft);
+            if (window.ResizeObserver) {
+              promptResizeObserver = new ResizeObserver(() => syncCardHeightSoft());
+              if (promptCardRef.value) {
+                promptResizeObserver.observe(promptCardRef.value);
+              }
+            }
+            // Extra ticks to catch late font/layout changes
+            setTimeout(syncCardHeightSoft, 80);
+            setTimeout(syncCardHeightSoft, 200);
+          });
+          onBeforeUnmount(() => {
+            document.removeEventListener('click', handleClickOutside);
+            window.removeEventListener('resize', syncThemeWidth);
+            window.removeEventListener('resize', syncCardHeightSoft);
+            if (promptResizeObserver && promptResizeObserver.disconnect) {
+              promptResizeObserver.disconnect();
+            }
+          });
+          watch(
+            activeTheme,
+            (key) => {
+              applyTheme(key);
+              localStorage.setItem('zimage-theme', key);
+              nextTick(syncThemeWidth);
+              nextTick(syncCardHeight);
+            },
+            { immediate: true }
+          );
+          watch(
+            () => [
+              prompt.value,
+              negativePrompt.value,
+              steps.value,
+              guidance.value,
+              height.value,
+              width.value,
+              seed.value,
+              batchCount.value,
+              selectedRatio.value,
+              upscaleScale.value,
+              autoUpscaleEnabled.value,
+            ],
+            () => nextTick(syncCardHeight)
+          );
+          watch(
+            () => results.value.length,
+            () => nextTick(syncCardHeight)
+          );
+          watch(
+            () => history.value.length,
+            () => nextTick(syncCardHeight)
           );
           const ratios = [
             { label: "1:1 512", width: 512, height: 512 },
@@ -1332,19 +1759,108 @@
             "a spaceship landing on a lush alien planet, epic scale, vibrant colors, concept art",
           ];
 
-          const successMsg = computed(() => (image.value && !loading.value && !error.value ? t('status.completed') : ""));
+          const successMsg = computed(() => {
+            if (!image.value) return "";
+            if (loading.value || batchRunning.value || upscaleLoading.value || totalWorkUnits.value > 0) return "";
+            if (error.value) return "";
+            return t('status.completed');
+          });
           const statusLabel = computed(() => {
             if (modelError.value) return `${t('status.loadFailed')}: ${modelError.value}`;
+            if (error.value) return `⚠ ${error.value}`;
+            if (upscaleError.value) return `⚠ ${upscaleError.value}`;
+            if (upscaleLoading.value) return `${t('upscale.running')}...`;
             if (stopRequested.value && (loading.value || batchRunning.value)) return t('status.stopRequested');
-            if (batchRunning.value) return `${t('status.batchGenerating')} ${batchCursor.value}/${batchTotal.value}`;
+            if (batchRunning.value) return t('status.batchGenerating');
             if (loading.value) return t('status.generating');
             if (modelLoading.value) return t('status.loading');
             return t('status.ready');
           });
           const statusTone = computed(() => {
             if (modelError.value) return "var(--danger)";
-            if (loading.value || modelLoading.value || batchRunning.value) return "var(--accent)";
+            if (loading.value || modelLoading.value || batchRunning.value || upscaleLoading.value) {
+              return "var(--accent)";
+            }
             return "var(--success)";
+          });
+          const perImagePercent = computed(() => {
+            if (!loading.value && !batchRunning.value) return 0;
+            const { current, total } = stepProgress.value;
+            if (!total) return loading.value ? 5 : 0;
+            return Math.min(100, Math.max(0, +((current / total) * 100).toFixed(1)));
+          });
+
+          const progressPercent = computed(() => {
+            if (!loading.value && !batchRunning.value) return 0;
+            const { current, total } = stepProgress.value;
+            if (batchRunning.value && batchTotal.value > 0) {
+              const batchProgress = Math.max(0, Math.min(batchCursor.value - 1, batchTotal.value));
+              const per = total ? current / total : 0;
+              const overall = ((batchProgress + per) / batchTotal.value) * 100;
+              return Math.min(100, Math.max(0, +overall.toFixed(1)));
+            }
+            return perImagePercent.value;
+          });
+          const upscaleProgressPercent = computed(() => {
+            if (!upscaleLoading.value) return 0;
+            const { current, total } = upscaleStepProgress.value;
+            if (total) {
+              return Math.min(100, Math.max(0, +((current / total) * 100).toFixed(1)));
+            }
+            return 30;
+          });
+          const upscaleProgressLabel = computed(() => {
+            if (!upscaleLoading.value) return "";
+            const pct = Math.min(100, Math.max(0, Math.round(upscaleProgressPercent.value)));
+            return `${pct}%`;
+          });
+
+          const imageProgressLabel = computed(() => {
+            if (!loading.value) return "";
+            const pct = Math.min(100, Math.max(0, Math.round(perImagePercent.value)));
+            return `${pct}%`;
+          });
+          const progressLabel = computed(() => {
+            const { current, total } = stepProgress.value;
+            if (!loading.value && !batchRunning.value) return "";
+            if (!total) return t('status.generating');
+            const pct = Math.min(100, Math.max(0, Math.round(progressPercent.value)));
+            return `${pct}%`;
+          });
+          const overallProgressActive = computed(
+            () => {
+              if (totalWorkUnits.value > 0) {
+                const done = Math.min(totalWorkUnits.value, completedWorkUnits.value);
+                const activePhase = currentWorkPhase.value === "generate" || currentWorkPhase.value === "upscale";
+                return done < totalWorkUnits.value || activePhase || loading.value || batchRunning.value || upscaleLoading.value;
+              }
+              return loading.value || batchRunning.value || upscaleLoading.value;
+            }
+          );
+          const overallProgressPercent = computed(() => {
+            if (totalWorkUnits.value > 0) {
+              const done = Math.min(totalWorkUnits.value, completedWorkUnits.value);
+              const active =
+                currentWorkPhase.value === "generate"
+                  ? perImagePercent.value / 100
+                  : currentWorkPhase.value === "upscale"
+                    ? upscaleProgressPercent.value / 100
+                    : 0;
+              const pct = ((done + active) / Math.max(1, totalWorkUnits.value)) * 100;
+              return Math.min(100, Math.max(0, +pct.toFixed(1)));
+            }
+            if (loading.value || batchRunning.value) return progressPercent.value;
+            if (upscaleLoading.value) return upscaleProgressPercent.value;
+            return 0;
+          });
+          const overallProgressLabel = computed(() => {
+            if (totalWorkUnits.value > 0) {
+              const pct = Math.min(100, Math.max(0, Math.round(overallProgressPercent.value)));
+              return `${pct}%`;
+            }
+            if (loading.value || batchRunning.value) return progressLabel.value;
+            if (upscaleLoading.value) return upscaleProgressLabel.value;
+            return "";
           });
           const isGenerateDisabled = computed(
             () => loading.value || modelLoading.value || !!modelError.value || batchRunning.value
@@ -1364,10 +1880,108 @@
             selectedIndex.value = 0;
             autoUpscaleEnabled.value = false;
             lastAutoBaseId.value = "";
+            stepProgress.value = { current: 0, total: 0 };
           };
 
           const randomizeSeed = () => {
             seed.value = Math.floor(Math.random() * 1_000_000);
+          };
+
+          const streamGenerateOnce = async (payload) => {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
+            const res = await fetch("/generate_stream", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+              signal: controller.signal,
+            });
+            if (!res.ok || !res.body) {
+              const text = await res.text();
+              clearTimeout(timeout);
+              throw new Error(text || "Failed to start generation");
+            }
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+
+            const cleanup = () => clearTimeout(timeout);
+
+            const promise = new Promise((resolve, reject) => {
+              const handleEvent = (eventName, data) => {
+                if (eventName === "progress") {
+                  const step = Number(data?.step || 0);
+                  const total = Number(data?.total_steps || payload.steps || steps.value || 0);
+                  stepProgress.value = { current: step, total };
+                  if (data?.note === "no_callback") {
+                    startFakeProgress(total);
+                  } else {
+                    clearFakeProgress();
+                  }
+                } else if (eventName === "complete") {
+                  stepProgress.value = { current: payload.steps || steps.value || 0, total: payload.steps || steps.value || 0 };
+                  clearFakeProgress();
+                  cleanup();
+                  resolve(data);
+                } else if (eventName === "error") {
+                  clearFakeProgress();
+                  cleanup();
+                  reject(new Error(data?.error || "Generation failed"));
+                }
+              };
+
+              const processBuffer = () => {
+                let idx;
+                while ((idx = buffer.indexOf("\n\n")) !== -1) {
+                  const rawEvent = buffer.slice(0, idx).trim();
+                  buffer = buffer.slice(idx + 2);
+                  if (!rawEvent) continue;
+                  const lines = rawEvent.split("\n");
+                  let eventName = "message";
+                  let dataLines = [];
+                  for (const line of lines) {
+                    if (line.startsWith("event:")) eventName = line.slice(6).trim();
+                    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+                  }
+                  const dataStr = dataLines.join("\n");
+                  let parsed = {};
+                  try {
+                    parsed = dataStr ? JSON.parse(dataStr) : {};
+                  } catch {
+                    parsed = {};
+                  }
+                  handleEvent(eventName, parsed);
+                }
+              };
+
+              const pump = async () => {
+                try {
+                  while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    processBuffer();
+                  }
+                  cleanup();
+                  reject(new Error("Connection closed before completion"));
+                } catch (err) {
+                  cleanup();
+                  clearFakeProgress();
+                  reject(err);
+                }
+              };
+
+              pump();
+            });
+
+            try {
+              return await promise;
+            } catch (err) {
+              if (controller.signal.aborted) {
+                throw new Error(t('status.generating') + " timeout");
+              }
+              throw err;
+            }
           };
 
           const applyRatio = (ratio) => {
@@ -1519,27 +2133,116 @@
             return { image: "", meta: {} };
           };
 
-          const upscaleImage = async () => {
-            const sourcePayload = pickUpscaleSource();
+          const streamUpscale = async (payload, isAuto = false) => {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
+            const res = await fetch("/upscale_stream", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+              signal: controller.signal,
+            });
+            if (!res.ok || !res.body) {
+              const text = await res.text();
+              clearTimeout(timeout);
+              throw new Error(text || "Failed to start upscale");
+            }
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let finished = false;
+            const cleanup = () => clearTimeout(timeout);
+            return new Promise((resolve, reject) => {
+              const handleEvent = (eventName, data) => {
+                if (eventName === "progress") {
+                  const current = Number(data?.current || 0);
+                  const total = Number(data?.total || 0) || current || 1;
+                  upscaleStepProgress.value = { current, total };
+                  return;
+                }
+                if (eventName === "result") {
+                  const current = upscaleStepProgress.value.current || 1;
+                  const total = upscaleStepProgress.value.total || current || 1;
+                  upscaleStepProgress.value = { current: total, total };
+                  finished = true;
+                  cleanup();
+                  reader.cancel().catch(() => {});
+                  resolve(data);
+                  return;
+                }
+                if (eventName === "error") {
+                  cleanup();
+                  reject(new Error(data?.message || "Upscale failed"));
+                  finished = true;
+                  reader.cancel().catch(() => {});
+                  return;
+                }
+              };
+              const read = () => {
+                reader.read().then(({ done, value }) => {
+                  if (done) {
+                    if (!finished) {
+                      cleanup();
+                      reject(new Error("Upscale interrupted"));
+                    }
+                    return;
+                  }
+                  buffer += decoder.decode(value, { stream: true });
+                  const parts = buffer.split("\n\n");
+                  buffer = parts.pop() || "";
+                  for (const chunk of parts) {
+                    const lines = chunk.split("\n");
+                    const eventLine = lines.find((line) => line.startsWith("event:"));
+                    const dataLine = lines.find((line) => line.startsWith("data:"));
+                    if (!eventLine || !dataLine) continue;
+                    const eventName = eventLine.replace("event:", "").trim();
+                    const dataRaw = dataLine.replace("data:", "").trim();
+                    let data;
+                    try {
+                      data = JSON.parse(dataRaw);
+                    } catch (err) {
+                      data = {};
+                    }
+                    handleEvent(eventName, data);
+                  }
+                  read();
+                }).catch((err) => {
+                  cleanup();
+                  reject(err);
+                });
+              };
+              read();
+            }).catch((err) => {
+              if (controller.signal.aborted) {
+                throw new Error(t('upscale.running') + " timeout");
+              }
+              throw err;
+            });
+          };
+
+          const upscaleImage = async ({ auto = false, sourceOverride = null } = {}) => {
+            const sourcePayload = sourceOverride || pickUpscaleSource();
             if (!sourcePayload.image) {
               upscaleError.value = t('upscale.noImage');
               return;
             }
             upscaleLoading.value = true;
             upscaleError.value = "";
-            try {
-              const res = await fetch("/upscale", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  image: sourcePayload.image,
-                  scale: upscaleScale.value,
-                }),
-              });
-              const data = await res.json();
-              if (!res.ok) {
-                throw new Error(data.error || "upscale failed");
+            upscaleStepProgress.value = { current: 0, total: 0 };
+            if (auto) {
+              currentWorkPhase.value = "upscale";
+            } else {
+              if (totalWorkUnits.value === 0) {
+                totalWorkUnits.value = 1;
+                completedWorkUnits.value = 0;
               }
+              currentWorkPhase.value = "upscale";
+            }
+            try {
+              const data = await streamUpscale({
+                image: sourcePayload.image,
+                scale: upscaleScale.value,
+              }, auto);
               const baseMeta = sourcePayload.meta || {};
               const meta = {
                 ...baseMeta,
@@ -1556,21 +2259,26 @@
               const newItem = { id, image: data.image, meta };
               const nextResults = [...results.value, newItem].slice(-12);
               results.value = nextResults;
-              addToHistory({ image: data.image, meta: { ...meta, scale: meta.applied_scale || meta.scale || scale } });
+              addToHistory({ image: data.image, meta: { ...meta, scale: meta.applied_scale || meta.scale || upscaleScale.value } });
             } catch (err) {
               upscaleError.value = err.message || "";
             } finally {
               upscaleLoading.value = false;
+              if (auto) {
+                completedWorkUnits.value = Math.min(
+                  totalWorkUnits.value,
+                  completedWorkUnits.value + 1
+                );
+              } else if (totalWorkUnits.value > 0 && completedWorkUnits.value < totalWorkUnits.value) {
+                completedWorkUnits.value += 1;
+              }
+              if (totalWorkUnits.value > 0 && completedWorkUnits.value >= totalWorkUnits.value) {
+                finalizeWork();
+              } else {
+                currentWorkPhase.value = "";
+              }
+              upscaleStepProgress.value = { current: 0, total: 0 };
             }
-          };
-
-          const triggerAutoUpscale = () => {
-            if (!autoUpscaleEnabled.value || upscaleLoading.value) return;
-            const latest = results.value[results.value.length - 1];
-            if (!latest || latest.meta?.type === "upscale") return;
-            if (lastAutoBaseId.value === latest.id) return;
-            lastAutoBaseId.value = latest.id;
-            upscaleImage();
           };
 
           const toggleAutoUpscale = () => {
@@ -1626,10 +2334,13 @@
           };
 
           watch(
-            () => results.value.map((r) => r.id).join(","),
-            (cur, prev) => {
-              if (cur === prev) return;
-              triggerAutoUpscale();
+            () => completedWorkUnits.value,
+            () => {
+              if (!autoUpscaleEnabled.value && !loading.value && !batchRunning.value && !upscaleLoading.value) {
+                totalWorkUnits.value = 0;
+                currentWorkPhase.value = "";
+                completedWorkUnits.value = 0;
+              }
             }
           );
 
@@ -1705,6 +2416,7 @@
           const closePreview = () => {
             previewOpen.value = false;
             magnifierVisible.value = false;
+            showInfoOverlay.value = false;
           };
 
           const generateOnce = async (overrides = {}) => {
@@ -1737,24 +2449,16 @@
             };
 
             console.log("generate payload", payload);
-
             const seedVal = overrides.seed ?? seed.value;
             if (seedVal !== "") {
               payload.seed = Number(seedVal);
             }
 
+            stepProgress.value = { current: 0, total: payload.steps || steps.value || 0 };
+            currentWorkPhase.value = "generate";
+
             try {
-              const res = await fetch("/generate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-              });
-
-              const data = await res.json();
-              if (!res.ok) {
-                throw new Error(data.error || "生成失败");
-              }
-
+              const data = await streamGenerateOnce(payload);
               image.value = data.image;
               meta.value = data.meta || null;
               const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -1766,11 +2470,14 @@
               }
               results.value = nextResults;
               addToHistory(data);
-              return true;
+              completedWorkUnits.value = Math.min(
+                totalWorkUnits.value,
+                completedWorkUnits.value + 1
+              );
+              return data;
             } catch (err) {
               error.value = err.message || "生成失败";
-              return false;
-            } finally {
+              return null;
             }
           };
 
@@ -1823,6 +2530,9 @@
             meta.value = null;
             results.value = [];
             selectedImage.value = "";
+            totalWorkUnits.value = count * (autoUpscaleEnabled.value ? 2 : 1);
+            completedWorkUnits.value = 0;
+            currentWorkPhase.value = "generate";
 
             for (let i = 0; i < count; i += 1) {
               batchCursor.value = i + 1;
@@ -1836,8 +2546,13 @@
               if (!seedWasEmpty) {
                 seed.value = nextSeed; // 保持用户输入的固定种子
               }
-              const ok = await generateOnce({ ...fixedParams, seed: nextSeed });
-              if (!ok || stopRequested.value) break;
+              const data = await generateOnce({ ...fixedParams, seed: nextSeed });
+              if (!data || stopRequested.value) break;
+              if (autoUpscaleEnabled.value) {
+                const sourcePayload = { image: data.image, meta: data.meta || {} };
+                await upscaleImage({ auto: true, sourceOverride: sourcePayload });
+                if (stopRequested.value) break;
+              }
             }
 
             loading.value = false;
@@ -1845,6 +2560,7 @@
             batchCursor.value = 0;
             batchTotal.value = 0;
             stopRequested.value = false;
+            finalizeWork();
             return true;
           };
 
@@ -1954,7 +2670,9 @@
             upscaleScale,
             upscaleLoading,
             upscaleError,
+            upscaleStepProgress,
             upscaleImage,
+            streamUpscale,
             hasPrev,
             hasNext,
             prevImage,
@@ -1969,6 +2687,15 @@
             batchTotal,
             stopRequested,
             isGenerateDisabled,
+            progressPercent,
+            imageProgressLabel,
+            progressLabel,
+            totalWorkUnits,
+            completedWorkUnits,
+            currentWorkPhase,
+            syncedCardStyle,
+            upscaleProgressPercent,
+            upscaleProgressLabel,
             applyHistory,
             regenerate,
             deleteHistory,
@@ -1978,15 +2705,30 @@
             switchLanguage,
             themeOptions,
             activeTheme,
+            activeThemeLabel,
+            activeThemeSwatch,
+            themeMenuOpen,
+            themeSwitchRef,
+            themeControlWidth,
+            syncThemeWidth,
+            getThemeSwatch,
+            toggleThemeMenu,
+            selectTheme,
             requestStop,
             autoUpscaleEnabled,
             toggleAutoUpscale,
             magnifierEnabled,
             toggleMagnifier,
             deleteResult,
+            overallProgressActive,
+            overallProgressPercent,
+            overallProgressLabel,
+            showInfoOverlay,
           };
         },
-      }).mount("#app");
+      })
+        .use(ElementPlus)
+        .mount("#app");
     </script>
   </body>
 </html>

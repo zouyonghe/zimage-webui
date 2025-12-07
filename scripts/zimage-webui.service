@@ -1,0 +1,17 @@
+[Unit]
+Description=Z-Image WebUI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/home/buding/Code/zimage-webui
+ExecStart=/home/buding/mambaforge/envs/zimage/bin/python webui_server.py
+Environment=ZIMAGE_PORT=9000
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

@@ -13,5 +13,6 @@ pyyaml
 addict
 future
 lmdb
+realesrgan
 
 # Real-ESRGAN / GFPGAN（已移除超分功能，无需这些依赖）

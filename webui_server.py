@@ -3,14 +3,35 @@ import io
 import json
 import os
 import signal
+import sys
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Lock, Thread
 from urllib.parse import urlparse
 
+import numpy as np
 import torch
 from diffusers import ZImagePipeline
+from PIL import Image
+try:
+    # 兼容 torchvision>=0.15 移除 functional_tensor 的情况
+    import torchvision.transforms.functional_tensor as _tv_ft  # type: ignore
+except Exception:  # noqa: BLE001
+    try:
+        import torchvision.transforms._functional_tensor as _tv_ft  # type: ignore
+        sys.modules["torchvision.transforms.functional_tensor"] = _tv_ft
+    except Exception:  # noqa: BLE001
+        _tv_ft = None
+try:
+    from realesrgan import RealESRGANer
+    from basicsr.archs.rrdbnet_arch import RRDBNet
+except Exception as exc:  # noqa: BLE001
+    RealESRGANer = None
+    RRDBNet = None
+    _UPSCALE_IMPORT_ERROR = str(exc)
+else:
+    _UPSCALE_IMPORT_ERROR = ""
 
 # ============================
 # 显存优化设置
@@ -34,6 +55,11 @@ MAX_STEPS = 50
 MAX_GUIDANCE = 20.0
 MIN_GUIDANCE = 0.0
 OUTPUT_DIR = ROOT / "outputs"
+MAX_UPSCALE_FACTOR = 5.0
+MAX_UPSCALE_EDGE = 4096
+UPSCALE_MODEL_PATH = Path(os.environ.get("ZIMAGE_UPSCALE_MODEL", ROOT / "weights" / "RealESRGAN_x4plus.pth"))
+UPSCALE_TILE = int(os.environ.get("ZIMAGE_UPSCALE_TILE", 256))
+UPSCALE_TILE_PAD = int(os.environ.get("ZIMAGE_UPSCALE_TILE_PAD", 10))
 
 
 _PIPE = None
@@ -43,6 +69,9 @@ _PIPE_LOCK = Lock()
 _GEN_LOCK = Lock()
 _WARMING = False
 _PIPE_ERROR = None
+_UPSCALER = None
+_UPSCALER_LOCK = Lock()
+_UPSCALER_ERROR = None
 
 
 def get_pipeline():
@@ -113,9 +142,54 @@ def warmup_pipeline_async():
     Thread(target=_load, daemon=True).start()
 
 
+def get_upscaler():
+    global _UPSCALER, _UPSCALER_ERROR  # noqa: PLW0603
+
+    if _UPSCALER is not None:
+        return _UPSCALER
+
+    if RealESRGANer is None or RRDBNet is None:
+        raise RuntimeError(f"RealESRGAN not available: {_UPSCALE_IMPORT_ERROR}")
+
+    with _UPSCALER_LOCK:
+        if _UPSCALER is not None:
+            return _UPSCALER
+
+        model_path = UPSCALE_MODEL_PATH
+        if not model_path.exists():
+            _UPSCALER_ERROR = f"Upscale model not found at {model_path}"
+            raise FileNotFoundError(_UPSCALER_ERROR)
+
+        device = _DEVICE or ("cuda" if torch.cuda.is_available() else "cpu")
+        net = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=23, num_grow_ch=32, scale=4)
+        gpu_id = None if device == "cpu" else 0
+        upsampler = RealESRGANer(
+            scale=4,
+            model_path=str(model_path),
+            model=net,
+            tile=UPSCALE_TILE,
+            tile_pad=UPSCALE_TILE_PAD,
+            pre_pad=0,
+            half=device == "cuda",
+            gpu_id=gpu_id,
+        )
+        _UPSCALER = (upsampler, device)
+        _UPSCALER_ERROR = None
+        print(f"Upscaler ready on {device} using model {model_path}")
+        return _UPSCALER
+
+
 class WebUIHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(WEB_DIR), **kwargs)
+
+    def _decode_base64_image(self, data_url: str):
+        if not data_url:
+            raise ValueError("image missing")
+        if data_url.startswith("data:"):
+            _, _, b64_part = data_url.partition(",")
+            data_url = b64_part or data_url
+        return base64.b64decode(data_url)
 
     def _send_json(self, status_code: int, payload: dict):
         data = json.dumps(payload).encode("utf-8")
@@ -179,16 +253,18 @@ class WebUIHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):  # noqa: N802
         path = urlparse(self.path).path.rstrip("/") or "/"
-        if path != "/generate":
-            self.send_error(404, "Unsupported endpoint")
-            return
-
         try:
             content_length = int(self.headers.get("content-length", "0"))
             payload_raw = self.rfile.read(content_length) if content_length > 0 else b"{}"
             payload = json.loads(payload_raw.decode("utf-8"))
         except Exception as exc:  # noqa: BLE001
             self._send_json(400, {"error": f"Invalid request body: {exc}"})
+            return
+
+        if path == "/upscale":
+            return self._handle_upscale(payload)
+        if path != "/generate":
+            self.send_error(404, "Unsupported endpoint")
             return
 
         try:
@@ -292,6 +368,89 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             },
         }
         self._send_json(200, response)
+
+    def _handle_upscale(self, payload: dict):
+        try:
+            image_b64 = payload.get("image")
+            scale = float(payload.get("scale", 2.0))
+        except Exception as exc:  # noqa: BLE001
+            self._send_json(400, {"error": f"Invalid parameter type: {exc}"})
+            return
+
+        if not image_b64:
+            self._send_json(400, {"error": "image is required"})
+            return
+
+        if scale <= 0:
+            self._send_json(400, {"error": "scale must be positive"})
+            return
+
+        scale = max(1.0, min(scale, MAX_UPSCALE_FACTOR))
+
+        try:
+            decoded = self._decode_base64_image(image_b64)
+            image = Image.open(io.BytesIO(decoded)).convert("RGB")
+        except Exception as exc:  # noqa: BLE001
+            self._send_json(400, {"error": f"Invalid image data: {exc}"})
+            return
+
+        src_w, src_h = image.size
+        target_w = int(src_w * scale)
+        target_h = int(src_h * scale)
+
+        if target_w > MAX_UPSCALE_EDGE or target_h > MAX_UPSCALE_EDGE:
+            aspect = src_w / src_h
+            if aspect >= 1:
+                target_w = MAX_UPSCALE_EDGE
+                target_h = int(target_w / aspect)
+            else:
+                target_h = MAX_UPSCALE_EDGE
+                target_w = int(target_h * aspect)
+            scale = round(target_w / src_w, 2)
+
+        try:
+            upscaler, device = get_upscaler()
+        except Exception as exc:  # noqa: BLE001
+            self._send_json(500, {"error": f"Upscale unavailable: {exc}"})
+            return
+
+        try:
+            # RealESRGAN expects BGR numpy input
+            img_np = np.array(image)[:, :, ::-1]
+            output, _ = upscaler.enhance(img_np, outscale=scale)
+            upscaled = Image.fromarray(output[:, :, ::-1])
+        except Exception as exc:  # noqa: BLE001
+            self._send_json(500, {"error": f"Upscale failed: {exc}"})
+            return
+
+        buffer = io.BytesIO()
+        upscaled.save(buffer, format="PNG")
+        encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_path = OUTPUT_DIR / f"upscaled_{timestamp}_{target_w}x{target_h}.png"
+        try:
+            upscaled.save(file_path, format="PNG")
+        except Exception as exc:  # noqa: BLE001
+            print(f"Failed to save upscaled image: {exc}")
+            file_path = None
+
+        self._send_json(
+            200,
+            {
+                "image": f"data:image/png;base64,{encoded}",
+                "meta": {
+                    "type": "upscale",
+                    "source_width": src_w,
+                    "source_height": src_h,
+                    "width": target_w,
+                    "height": target_h,
+                    "applied_scale": scale,
+                    "saved_path": str(file_path) if file_path else None,
+                },
+            },
+        )
 
     def log_message(self, fmt, *args):  # noqa: D401,N802
         """Silence noisy health polling logs."""

@@ -8,11 +8,14 @@
 - 连续生成：一次点击可连续生成 1–10 张，默认每张使用独立随机种子；填入固定种子则按该值生成。
 - 自动保存：每次生成自动写入 `outputs/`，文件名包含时间戳、分辨率和种子（无种子时标记为 `rand`）。接口返回的 `meta.saved_path` 也可查看保存路径。
 - 初次加载随机填充一条提示词，便于直接试跑。
+- 高分放大：内置 Real-ESRGAN 超分，参数区可调倍率（1–4x），预览区有“高分放大”按钮触发；可选“自动放大”开启后，对后续生成的图片自动超分。
+- 放大镜：预览时可手动开启放大镜按钮查看局部细节（默认关闭，避免高分图性能开销）。
 
 ## 环境要求
 - Python 3.10+
 - CUDA GPU（需要可用的 PyTorch CUDA 版本）
 - 本地 Z-Image 权重已放在 `zimage-model/`（默认使用本地权重，不走网络）
+- （可选）Real-ESRGAN 权重用于模型超分：`weights/RealESRGAN_x4plus.pth`，可设置 `ZIMAGE_UPSCALE_MODEL` 覆盖路径
 
 ## 安装
 ```bash
@@ -23,6 +26,10 @@ pip install -r requirements.txt
 
 # 下载模型权重（需先安装 aria2c；默认使用国内镜像，脚本会放到仓库根的 zimage-model/ 下）
 cd scripts && bash download_models.sh && cd ..
+
+# 下载 Real-ESRGAN 权重（用于高分辨率超分）
+wget -O weights/RealESRGAN_x4plus.pth \
+  https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth
 ```
 
 ## 运行
@@ -47,3 +54,6 @@ python webui_server.py
 ## 其他
 - 如果需要调整分辨率范围，前后端都有最小 512 / 最大 1024、步长 16 的限制；同步修改 `webui/index.html` 与 `webui_server.py` 中的参数即可。
 - 服务器日志会打印生成请求参数与错误信息，便于排查。
+- Real-ESRGAN 安装提示 `tb-nightly` 缺失可忽略；如需消除，可先 `pip install tensorboard`，再执行 `pip install realesrgan --no-deps`。只要启动服务的 Python 环境能 `import realesrgan` 即可使用模型超分。
+- 高分放大结果会自动追加到结果列表与历史记录，历史中会显示放大倍数；默认“自动放大”关闭。
+- 放大镜开关位于预览操作栏，仅在预览大图时使用，关闭后不会渲染放大镜以节省性能。

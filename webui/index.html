@@ -128,6 +128,39 @@
         resize: vertical;
       }
 
+      input[type="range"] {
+        width: 100%;
+        -webkit-appearance: none;
+        appearance: none;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--panel-strong);
+        margin: 0;
+        padding: 0;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        border: 2px solid #0c1024;
+        box-shadow: 0 4px 10px rgba(124, 58, 237, 0.35);
+        cursor: pointer;
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        border: 2px solid #0c1024;
+        box-shadow: 0 4px 10px rgba(124, 58, 237, 0.35);
+        cursor: pointer;
+      }
+
       .row {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -299,6 +332,13 @@
         border: 1px solid var(--panel-strong);
         background: rgba(255, 255, 255, 0.04);
         align-items: center;
+        cursor: zoom-in;
+        transition: border-color 0.15s ease, transform 0.1s ease;
+      }
+
+      .history-item:hover {
+        border-color: var(--panel-strong);
+        transform: translateY(-1px);
       }
 
       .history-thumb {
@@ -307,6 +347,7 @@
         border-radius: 10px;
         object-fit: cover;
         border: 1px solid var(--panel-strong);
+        pointer-events: none;
       }
 
       .history-meta {
@@ -377,20 +418,21 @@
         background: var(--panel);
         border: 1px solid var(--panel-strong);
         border-radius: 16px;
-        padding: 16px;
-        max-width: 95vw;
-        max-height: 95vh;
+        padding: 20px;
+        max-width: 98vw;
+        max-height: 98vh;
         display: grid;
         gap: 12px;
         box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
       }
 
       .preview-body img {
-        max-width: 88vw;
-        max-height: 80vh;
+        max-width: 96vw;
+        max-height: 88vh;
         border-radius: 12px;
         object-fit: contain;
         justify-self: center;
+        transition: transform 0.15s ease;
       }
 
       .preview-actions {
@@ -438,6 +480,61 @@
       .lang-btn:hover:not(.active) {
         background: rgba(255, 255, 255, 0.1);
         color: var(--text);
+      }
+
+      .upscale-range {
+        width: 100%;
+        display: block;
+      }
+
+      .auto-upscale-active {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
+        color: #0c1024 !important;
+        box-shadow: 0 10px 30px rgba(124, 58, 237, 0.35);
+      }
+
+      input[type="range"] {
+        width: 100%;
+        -webkit-appearance: none;
+        appearance: none;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--panel-strong);
+        margin: 0;
+        padding: 0;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        border: 2px solid #0c1024;
+        box-shadow: 0 4px 10px rgba(124, 58, 237, 0.35);
+        cursor: pointer;
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        border: 2px solid #0c1024;
+        box-shadow: 0 4px 10px rgba(124, 58, 237, 0.35);
+        cursor: pointer;
+      }
+
+      .magnifier-lens {
+        position: fixed;
+        pointer-events: none;
+        border-radius: 50%;
+        border: 2px solid var(--accent);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        z-index: 30;
+        backdrop-filter: blur(0px);
+        overflow: hidden;
       }
 
       @media (max-width: 720px) {
@@ -594,6 +691,22 @@
             </option>
           </select>
         </div>
+        <div>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <div style="flex:1; min-width: 200px;">
+              <label>{{ t('upscale.scale') }}: {{ upscaleScale.toFixed(1) }}×</label>
+              <input
+                class="upscale-range"
+                type="range"
+                min="1"
+                max="4"
+                step="0.1"
+                v-model.number="upscaleScale"
+                :disabled="loading || batchRunning || upscaleLoading"
+              />
+            </div>
+          </div>
+        </div>
 
         <div class="actions">
         <button class="primary" :disabled="isGenerateDisabled" @click="generate()">
@@ -607,6 +720,14 @@
             {{ stopRequested ? t('stop.requested') : t('stop.button') }}
           </button>
           <button class="secondary" :disabled="loading || batchRunning" @click="randomizeSeed">{{ t('randomSeed.button') }}</button>
+          <button
+            class="secondary"
+            :class="{ primary: autoUpscaleEnabled, 'auto-upscale-active': autoUpscaleEnabled }"
+            :disabled="upscaleLoading"
+            @click="toggleAutoUpscale"
+          >
+            {{ t('upscale.autoLabel') }}
+          </button>
           <button class="secondary" :disabled="loading || batchRunning" @click="resetPrompt">{{ t('reset.button') }}</button>
           <button class="secondary" :disabled="!image || loading || batchRunning" @click="downloadImage">{{ t('save.button') }}</button>
         </div>
@@ -617,14 +738,15 @@
           <span v-else>{{ statusLabel }}</span>
         </div>
 
-        <div class="meta" v-if="meta">
-          <div class="pill">{{ t('meta.device') }}: {{ meta.device }}</div>
-          <div class="pill">{{ t('meta.steps') }}: {{ meta.steps }}</div>
-          <div class="pill">{{ t('meta.guidance') }}: {{ meta.guidance }}</div>
-          <div class="pill">{{ t('meta.size') }}: {{ meta.width }} × {{ meta.height }}</div>
-          <div class="pill" v-if="meta.negative_prompt">{{ t('meta.negative') }}: {{ meta.negative_prompt }}</div>
-          <div class="pill" v-if="meta.seed !== null">{{ t('meta.seed') }}: {{ meta.seed }}</div>
-        </div>
+      <div class="meta" v-if="meta">
+        <div class="pill">{{ t('meta.device') }}: {{ meta.device }}</div>
+        <div class="pill">{{ t('meta.steps') }}: {{ meta.steps }}</div>
+        <div class="pill">{{ t('meta.guidance') }}: {{ meta.guidance }}</div>
+        <div class="pill">{{ t('meta.size') }}: {{ meta.width }} × {{ meta.height }}</div>
+        <div class="pill" v-if="meta.negative_prompt">{{ t('meta.negative') }}: {{ meta.negative_prompt }}</div>
+        <div class="pill" v-if="meta.seed !== null">{{ t('meta.seed') }}: {{ meta.seed }}</div>
+        <div class="pill" v-if="meta.scale">{{ t('meta.scale') }}: {{ meta.scale }}×</div>
+      </div>
       </section>
 
       <section class="card">
@@ -655,19 +777,26 @@
         </div>
         <div v-if="history.length === 0" class="placeholder">{{ t('history.placeholder') }}</div>
         <div v-else class="history-list">
-          <div class="history-item" v-for="item in history" :key="item.id">
+          <div
+            class="history-item"
+            v-for="(item, idx) in history"
+            :key="item.id"
+            @click="openPreview(idx, 'history')"
+            :title="t('history.title')"
+          >
             <img class="history-thumb" :src="item.image" alt="历史缩略图" />
             <div>
               <div class="history-meta">
                 {{ item.prompt }}
-                <div>{{ t('history.steps') }}: {{ item.steps }} | {{ t('history.guidance') }}: {{ item.guidance }} | {{ t('history.seed') }}: {{ item.seed ?? t('seed.placeholder') }}</div>
-                <div>{{ t('history.size') }}: {{ item.width }}×{{ item.height }}</div>
-                <div v-if="item.negative">{{ t('history.negative') }}: {{ item.negative }}</div>
-              </div>
-              <div class="history-actions">
-                <button class="secondary" @click="applyHistory(item)">{{ t('history.refill') }}</button>
-                <button class="secondary" @click="regenerate(item)">{{ t('history.regenerate') }}</button>
-                <button class="secondary" @click="deleteHistory(item.id)">{{ t('history.delete') }}</button>
+              <div>{{ t('history.steps') }}: {{ item.steps }} | {{ t('history.guidance') }}: {{ item.guidance }} | {{ t('history.seed') }}: {{ item.seed ?? t('seed.placeholder') }}</div>
+              <div>{{ t('history.size') }}: {{ item.width }}×{{ item.height }}</div>
+              <div v-if="item.negative">{{ t('history.negative') }}: {{ item.negative }}</div>
+              <div v-if="item.scale && item.scale !== 1">{{ t('meta.scale') }}: {{ item.scale }}×</div>
+            </div>
+            <div class="history-actions">
+              <button class="secondary" @click.stop="applyHistory(item)">{{ t('history.refill') }}</button>
+              <button class="secondary" @click.stop="regenerate(item)">{{ t('history.regenerate') }}</button>
+              <button class="secondary" @click.stop="deleteHistory(item.id)">{{ t('history.delete') }}</button>
               </div>
             </div>
           </div>
@@ -678,21 +807,46 @@
         <div>{{ statusLabel }}</div>
       </div>
 
-      <div v-if="previewOpen" class="preview-overlay" @click.self="closePreview">
-          <div class="preview-body">
-          <img :src="selectedImage || results[selectedIndex]?.image || results[0]?.image" :alt="t('results.title')" />
+      <div v-if="previewOpen" class="preview-overlay" @click.self="closePreview" @wheel.prevent="onPreviewWheel">
+          <div class="preview-body" @wheel.prevent="onPreviewWheel">
+          <img
+            :src="(currentPreviewItem && currentPreviewItem.image) || selectedImage || results[selectedIndex]?.image || results[0]?.image"
+            :alt="t('results.title')"
+            @mousemove="onMagnifierMove"
+            @mouseleave="hideMagnifier"
+            @click.left.stop="nextImage"
+            @contextmenu.prevent.stop="prevImage"
+          />
           <div class="preview-actions">
             <div class="nav-buttons">
               <button class="secondary" @click.stop="prevImage" :disabled="!hasPrev">{{ t('preview.previous') }}</button>
               <button class="secondary" @click.stop="nextImage" :disabled="!hasNext">{{ t('preview.next') }}</button>
             </div>
             <div style="display:flex; gap:8px; margin-left:auto;">
-              <button class="secondary" @click.stop="downloadImage">{{ t('preview.download') }}</button>
+              <button
+                class="secondary"
+                :class="{ 'auto-upscale-active': magnifierEnabled }"
+                @click.stop="toggleMagnifier"
+              >
+                {{ t('preview.magnifier') }}
+              </button>
+              <button class="secondary" :disabled="!canUpscale || upscaleLoading" @click.stop="upscaleImage">
+                {{ upscaleLoading ? t('upscale.running') : t('upscale.button') }}
+              </button>
+              <div class="status" style="margin:0;" :class="{'error': upscaleError}">
+                <span v-if="upscaleError">⚠ {{ upscaleError }}</span>
+              </div>
+              <button class="secondary" @click.stop="downloadPreviewImage">{{ t('preview.download') }}</button>
               <button class="secondary" @click.stop="closePreview">{{ t('preview.close') }}</button>
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      <div
+        v-if="magnifierVisible && magnifierEnabled"
+        class="magnifier-lens"
+        :style="magnifierStyle"
+      ></div>
       </main>
     </div>
 
@@ -737,6 +891,13 @@
               'preview.next': '下一张',
               'preview.download': '下载图片',
               'preview.close': '关闭',
+              'preview.magnifier': '放大镜',
+              'upscale.title': '高分辨率放大',
+              'upscale.scale': '高分放大倍率',
+              'upscale.button': '高分放大',
+              'upscale.running': '正在放大...',
+              'upscale.noImage': '暂无可放大的图片',
+              'upscale.autoLabel': '自动放大',
               'status.ready': '已就绪',
               'status.loading': '模型加载中...',
               'status.generating': '正在生成...',
@@ -752,6 +913,7 @@
               'meta.size': '尺寸',
               'meta.negative': '负面',
               'meta.seed': '种子',
+              'meta.scale': '放大',
               'history.steps': '步数',
               'history.guidance': '引导',
               'history.seed': '种子',
@@ -790,6 +952,13 @@
               'preview.next': 'Next',
               'preview.download': 'Download Image',
               'preview.close': 'Close',
+              'preview.magnifier': 'Magnifier',
+              'upscale.title': 'High-Res Upscale',
+              'upscale.scale': 'Hi-Res Scale',
+              'upscale.button': 'Hi-Res Upscale',
+              'upscale.running': 'Upscaling...',
+              'upscale.noImage': 'No image to upscale yet',
+              'upscale.autoLabel': 'Auto Upscale',
               'status.ready': 'Ready',
               'status.loading': 'Model loading...',
               'status.generating': 'Generating...',
@@ -805,6 +974,7 @@
               'meta.size': 'Size',
               'meta.negative': 'Negative',
               'meta.seed': 'Seed',
+              'meta.scale': 'Upscale',
               'history.steps': 'Steps',
               'history.guidance': 'Guidance',
               'history.seed': 'Seed',
@@ -843,6 +1013,13 @@
               'preview.next': '次へ',
               'preview.download': '画像をダウンロード',
               'preview.close': '閉じる',
+              'preview.magnifier': 'ルーペ',
+              'upscale.title': '高解像度アップスケール',
+              'upscale.scale': '高解像度倍率',
+              'upscale.button': '高解像度アップスケール',
+              'upscale.running': 'アップスケール中...',
+              'upscale.noImage': 'アップスケールできる画像がありません',
+              'upscale.autoLabel': '自動アップスケール',
               'status.ready': '準備完了',
               'status.loading': 'モデル読み込み中...',
               'status.generating': '生成中...',
@@ -858,6 +1035,7 @@
               'meta.size': 'サイズ',
               'meta.negative': 'ネガティブ',
               'meta.seed': 'シード',
+              'meta.scale': 'スケール',
               'history.steps': 'ステップ',
               'history.guidance': 'ガイダンス',
               'history.seed': 'シード',
@@ -886,7 +1064,21 @@
           const image = ref("");
           const selectedImage = ref("");
           const selectedIndex = ref(0);
+          const previewSource = ref("results");
           const previewOpen = ref(false);
+          const magnifierVisible = ref(false);
+          const magnifierSize = ref(200);
+          const magnifierZoom = ref(2);
+          const magnifierImage = ref("");
+          const magnifierData = ref({ bgX: 0, bgY: 0, naturalWidth: 0, naturalHeight: 0, clientX: 0, clientY: 0 });
+          const magnifierEnabled = ref(false);
+          let magnifierRAF = null;
+          let magnifierPending = null;
+          const upscaleScale = ref(2.0);
+          const upscaleLoading = ref(false);
+          const upscaleError = ref("");
+          const autoUpscaleEnabled = ref(false);
+          const lastAutoBaseId = ref("");
           const history = ref([]);
           const selectedRatio = ref("1:1 512");
           
@@ -968,6 +1160,8 @@
             results.value = [];
             selectedImage.value = "";
             selectedIndex.value = 0;
+            autoUpscaleEnabled.value = false;
+            lastAutoBaseId.value = "";
           };
 
           const randomizeSeed = () => {
@@ -1019,15 +1213,21 @@
             const entry = {
               id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
               image: payload.image,
-              prompt: payload.meta.prompt,
+              prompt: payload.meta.prompt || "",
               negative: payload.meta.negative_prompt,
               steps: payload.meta.steps,
               guidance: payload.meta.guidance,
               width: payload.meta.width,
               height: payload.meta.height,
               seed: payload.meta.seed,
+              type: payload.meta.type || "generate",
+              scale: payload.meta.scale || 1,
             };
-            history.value = [entry, ...history.value].slice(0, 12);
+            const nextHistory = [...history.value, entry].slice(-12);
+            if (previewOpen.value && previewSource.value === "history") {
+              selectedIndex.value = Math.max(0, Math.min(selectedIndex.value, nextHistory.length - 1));
+            }
+            history.value = nextHistory;
           };
 
           const makeFilename = (targetMeta, fallbackIndex = 0) => {
@@ -1049,6 +1249,160 @@
             });
           };
 
+          const downloadPreviewImage = () => {
+            const item = currentPreviewItem.value;
+            if (!item) return;
+            const link = document.createElement("a");
+            link.href = item.image;
+            link.download = makeFilename(item.meta || item, selectedIndex.value);
+            link.click();
+          };
+
+          const onMagnifierMove = (event) => {
+            if (!magnifierEnabled.value) return;
+            const img = event.currentTarget;
+            if (!img) return;
+            magnifierPending = {
+              clientX: event.clientX,
+              clientY: event.clientY,
+              rect: img.getBoundingClientRect(),
+              naturalWidth: img.naturalWidth || img.getBoundingClientRect().width,
+              naturalHeight: img.naturalHeight || img.getBoundingClientRect().height,
+              src: img.src,
+            };
+            if (!magnifierRAF) {
+              magnifierRAF = requestAnimationFrame(() => {
+                if (!magnifierPending) {
+                  magnifierRAF = null;
+                  return;
+                }
+                const { clientX, clientY, rect, naturalWidth, naturalHeight, src } = magnifierPending;
+                magnifierPending = null;
+                magnifierRAF = null;
+                if (!magnifierEnabled.value) return;
+                const x = clientX - rect.left;
+                const y = clientY - rect.top;
+                magnifierData.value = {
+                  bgX: (x / rect.width) * naturalWidth,
+                  bgY: (y / rect.height) * naturalHeight,
+                  naturalWidth,
+                  naturalHeight,
+                  clientX,
+                  clientY,
+                };
+                magnifierImage.value = src;
+                magnifierVisible.value = true;
+              });
+            }
+          };
+
+          const hideMagnifier = () => {
+            magnifierVisible.value = false;
+          };
+
+          const onPreviewWheel = (event) => {
+            event.preventDefault();
+            const delta = event.deltaY;
+            const step = delta > 0 ? -0.2 : 0.2;
+            const next = Math.min(5, Math.max(1, +(magnifierZoom.value + step).toFixed(2)));
+            magnifierZoom.value = next;
+          };
+
+          const pickUpscaleSource = () => {
+            if (currentPreviewItem.value?.image) return { image: currentPreviewItem.value.image, meta: currentPreviewItem.value.meta || currentPreviewItem.value };
+            if (results.value[selectedIndex.value]?.image) return { image: results.value[selectedIndex.value].image, meta: results.value[selectedIndex.value].meta || results.value[selectedIndex.value] };
+            if (results.value.length > 0) return { image: results.value[0].image, meta: results.value[0].meta || results.value[0] };
+            if (selectedImage.value) return { image: selectedImage.value, meta: meta.value || {} };
+            if (image.value) return { image: image.value, meta: meta.value || {} };
+            return { image: "", meta: {} };
+          };
+
+          const upscaleImage = async () => {
+            const sourcePayload = pickUpscaleSource();
+            if (!sourcePayload.image) {
+              upscaleError.value = t('upscale.noImage');
+              return;
+            }
+            upscaleLoading.value = true;
+            upscaleError.value = "";
+            try {
+              const res = await fetch("/upscale", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  image: sourcePayload.image,
+                  scale: upscaleScale.value,
+                }),
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                throw new Error(data.error || "upscale failed");
+              }
+              const baseMeta = sourcePayload.meta || {};
+              const meta = {
+                ...baseMeta,
+                ...(data.meta || {}),
+                type: "upscale",
+                scale: (data.meta && (data.meta.applied_scale || data.meta.scale)) || upscaleScale.value,
+                prompt: baseMeta.prompt || prompt.value || "",
+                negative_prompt: baseMeta.negative_prompt || negativePrompt.value || "",
+                steps: baseMeta.steps ?? steps.value,
+                guidance: baseMeta.guidance ?? guidance.value,
+                seed: baseMeta.seed ?? null,
+              };
+              const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+              const newItem = { id, image: data.image, meta };
+              const nextResults = [...results.value, newItem].slice(-12);
+              if (!autoUpscaleEnabled.value) {
+                previewSource.value = "results";
+                selectedIndex.value = 0;
+                selectedImage.value = data.image;
+                previewOpen.value = true;
+              }
+              results.value = nextResults;
+              addToHistory({ image: data.image, meta: { ...meta, scale: meta.applied_scale || meta.scale || scale } });
+            } catch (err) {
+              upscaleError.value = err.message || "";
+            } finally {
+              upscaleLoading.value = false;
+            }
+          };
+
+          const triggerAutoUpscale = () => {
+            if (!autoUpscaleEnabled.value || upscaleLoading.value) return;
+            const latest = results.value[0];
+            if (!latest || latest.meta?.type === "upscale") return;
+            if (lastAutoBaseId.value === latest.id) return;
+            lastAutoBaseId.value = latest.id;
+            upscaleImage();
+          };
+
+          const toggleAutoUpscale = () => {
+            autoUpscaleEnabled.value = !autoUpscaleEnabled.value;
+          };
+
+          watch(
+            magnifierEnabled,
+            (enabled) => {
+              if (!enabled) {
+                magnifierVisible.value = false;
+                magnifierPending = null;
+                if (magnifierRAF) {
+                  cancelAnimationFrame(magnifierRAF);
+                  magnifierRAF = null;
+                }
+              }
+            },
+            { immediate: false }
+          );
+
+          const toggleMagnifier = () => {
+            magnifierEnabled.value = !magnifierEnabled.value;
+            if (!magnifierEnabled.value) {
+              hideMagnifier();
+            }
+          };
+
 
           const requestStop = () => {
             if (loading.value || batchRunning.value) {
@@ -1056,34 +1410,86 @@
             }
           };
 
-          const hasPrev = computed(() => selectedIndex.value > 0);
-          const hasNext = computed(() => selectedIndex.value < results.value.length - 1);
+          watch(
+            () => results.value.map((r) => r.id).join(","),
+            (cur, prev) => {
+              if (cur === prev) return;
+              triggerAutoUpscale();
+            }
+          );
+
+          const previewItems = computed(() => (previewSource.value === "history" ? history.value : results.value));
+
+          const currentPreviewItem = computed(() => {
+            const list = previewItems.value;
+            if (!list.length) return null;
+            return list[selectedIndex.value] || list[0];
+          });
+
+          const canUpscale = computed(() => {
+            return (
+              !!(currentPreviewItem.value && currentPreviewItem.value.image) ||
+              !!selectedImage.value ||
+              !!image.value ||
+              results.value.length > 0
+            );
+          });
+
+          const magnifierStyle = computed(() => {
+            if (!magnifierVisible.value || !magnifierEnabled.value) return {};
+            const { bgX, bgY, naturalWidth, naturalHeight, clientX, clientY } = magnifierData.value;
+            if (!naturalWidth || !naturalHeight) return {};
+            const size = magnifierSize.value;
+            const zoom = magnifierZoom.value;
+            const backgroundSize = `${naturalWidth * zoom}px ${naturalHeight * zoom}px`;
+            const backgroundPosition = `${size / 2 - bgX * zoom}px ${size / 2 - bgY * zoom}px`;
+            return {
+              width: `${size}px`,
+              height: `${size}px`,
+              left: `${clientX - size / 2}px`,
+              top: `${clientY - size / 2}px`,
+              backgroundImage: `url(${magnifierImage.value || (currentPreviewItem.value && currentPreviewItem.value.image) || ""})`,
+              backgroundRepeat: "no-repeat",
+              backgroundSize,
+              backgroundPosition,
+            };
+          });
+
+          const hasPrev = computed(() => selectedIndex.value > 0 && previewItems.value.length > 0);
+          const hasNext = computed(() => selectedIndex.value < previewItems.value.length - 1);
 
           const prevImage = () => {
             if (!hasPrev.value) return;
             selectedIndex.value -= 1;
-            selectedImage.value = results.value[selectedIndex.value].image;
+            const item = currentPreviewItem.value;
+            selectedImage.value = item?.image || "";
+            magnifierImage.value = item?.image || "";
           };
 
           const nextImage = () => {
             if (!hasNext.value) return;
             selectedIndex.value += 1;
-            selectedImage.value = results.value[selectedIndex.value].image;
+            const item = currentPreviewItem.value;
+            selectedImage.value = item?.image || "";
+            magnifierImage.value = item?.image || "";
           };
 
-          const openPreview = (idx = 0) => {
-            if (!results.value.length) return;
-            const index = Math.max(0, Math.min(results.value.length - 1, idx));
-            const item = results.value[index];
+          const openPreview = (idx = 0, source = "results") => {
+            previewSource.value = source;
+            const list = source === "history" ? history.value : results.value;
+            if (!list.length) return;
+            const index = Math.max(0, Math.min(list.length - 1, idx));
+            const item = list[index];
             if (!item) return;
             selectedIndex.value = index;
             selectedImage.value = item.image;
+            magnifierImage.value = item.image;
             previewOpen.value = true;
-            console.log("preview open", index);
           };
 
           const closePreview = () => {
             previewOpen.value = false;
+            magnifierVisible.value = false;
           };
 
           const generateOnce = async (overrides = {}) => {
@@ -1136,9 +1542,14 @@
 
               image.value = data.image;
               meta.value = data.meta || null;
-              selectedImage.value = data.image;
               const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-              results.value = [{ id, image: data.image, meta: data.meta || {} }, ...results.value].slice(0, 12);
+              const nextResults = [...results.value, { id, image: data.image, meta: data.meta || {} }].slice(-12);
+              if (previewOpen.value && previewSource.value === "results") {
+                selectedIndex.value = Math.max(0, Math.min(selectedIndex.value, nextResults.length - 1));
+              } else {
+                selectedImage.value = data.image;
+              }
+              results.value = nextResults;
               addToHistory(data);
               return true;
             } catch (err) {
@@ -1317,10 +1728,23 @@
             applyRatio,
             selectedImage,
             selectedIndex,
+            previewSource,
+            currentPreviewItem,
+            canUpscale,
+            magnifierVisible,
+            magnifierStyle,
+            onMagnifierMove,
+            hideMagnifier,
+            onPreviewWheel,
+            upscaleScale,
+            upscaleLoading,
+            upscaleError,
+            upscaleImage,
             hasPrev,
             hasNext,
             prevImage,
             nextImage,
+            downloadPreviewImage,
             generateOnce,
             onRatioChange,
             snapDimensions,
@@ -1338,6 +1762,10 @@
             t,
             switchLanguage,
             requestStop,
+            autoUpscaleEnabled,
+            toggleAutoUpscale,
+            magnifierEnabled,
+            toggleMagnifier,
           };
         },
       }).mount("#app");

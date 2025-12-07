@@ -1173,7 +1173,8 @@
       window.addEventListener("resize", () => requestAnimationFrame(syncCardsDom));
 
       const DEFAULT_PROMPT = "a cat sitting on a chair, high quality, detailed";
-      const STREAM_TIMEOUT_MS = 10000; // 10 seconds per stream request
+      const STREAM_TIMEOUT_MS = 30000; // 30 seconds per generate stream request
+      const UPSCALE_TIMEOUT_MS = 30000; // 30 seconds per upscale stream request
 
       createApp({
         setup() {
@@ -2201,7 +2202,7 @@
 
           const streamUpscale = async (payload, isAuto = false) => {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
+            const timeout = setTimeout(() => controller.abort(), UPSCALE_TIMEOUT_MS);
             const res = await fetch("/upscale_stream", {
               method: "POST",
               headers: { "Content-Type": "application/json" },

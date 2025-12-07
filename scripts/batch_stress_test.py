@@ -40,7 +40,7 @@ async def main():
                           const t0 = performance.now();
                           try {
                             const controller = new AbortController();
-                            const timeout = setTimeout(() => controller.abort(), 15000);
+                            const timeout = setTimeout(() => controller.abort(), 30000);
                             const res = await fetch('/generate_stream', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
@@ -71,10 +71,10 @@ async def main():
                         }
                         """,
                     ),
-                    timeout=20,
+                    timeout=40,
                 )
             except asyncio.TimeoutError:
-                res = {"ok": False, "status": None, "dt": 20000, "err": "python-timeout"}
+                res = {"ok": False, "status": None, "dt": 40000, "err": "python-timeout"}
             results.append(res)
 
         await browser.close()

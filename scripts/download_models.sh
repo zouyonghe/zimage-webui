@@ -4,8 +4,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 MODEL_DIR="$ROOT_DIR/zimage-model"
+WEIGHTS_DIR="$ROOT_DIR/weights"
 
 base="https://hf-mirror.com/Tongyi-MAI/Z-Image-Turbo/resolve/main"
+realesrgan_url="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth"
 
 files=(
 "text_encoder/model-00001-of-00003.safetensors"  # text encoder shard 1/3
@@ -28,3 +30,8 @@ for f in "${files[@]}"; do
     echo "Downloading $f -> $MODEL_DIR/$f"
     aria2c -x 16 -s 16 -k 5M "$base/$f" -d "$target_dir" -o "$target_file"
 done
+
+# Download Real-ESRGAN weight
+mkdir -p "$WEIGHTS_DIR"
+echo "Downloading RealESRGAN_x4plus.pth -> $WEIGHTS_DIR/"
+aria2c -x 16 -s 16 -k 5M "$realesrgan_url" -d "$WEIGHTS_DIR" -o "RealESRGAN_x4plus.pth"

@@ -4,6 +4,7 @@
 
 ## 功能概览
 - Vue 单页前端，支持提示词 / 负面词、步数、引导强度、种子。
+- 内置中/英/日三语切换。
 - 画幅预设下拉（包含 512/768/1024 的 1:1 及常见比例），输入框自动对齐到 16 像素步长并限制在 512–1024。
 - 连续生成：一次点击可连续生成 1–10 张，默认每张使用独立随机种子；填入固定种子则按该值生成。
 - 自动保存：每次生成自动写入 `outputs/`，文件名包含时间戳、分辨率和种子（无种子时标记为 `rand`）。接口返回的 `meta.saved_path` 也可查看保存路径。
@@ -24,12 +25,9 @@
 
 pip install -r requirements.txt
 
-# 下载模型权重（需先安装 aria2c；默认使用国内镜像，脚本会放到仓库根的 zimage-model/ 下）
+# 下载模型权重（需先安装 aria2c；脚本会下载主模型到 zimage-model/，并下载 RealESRGAN_x4plus 到 weights/）
 cd scripts && bash download_models.sh && cd ..
 
-# 下载 Real-ESRGAN 权重（用于高分辨率超分）
-wget -O weights/RealESRGAN_x4plus.pth \
-  https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth
 ```
 
 ## 运行

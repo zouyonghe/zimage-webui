@@ -254,6 +254,29 @@
         color: var(--text);
       }
 
+      .thumb .thumb-close {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: none;
+        background: rgba(0, 0, 0, 0.45);
+        color: #fff;
+        font-weight: 700;
+        cursor: pointer;
+        line-height: 24px;
+        text-align: center;
+        padding: 0;
+        transition: transform 0.15s ease, background 0.15s ease;
+      }
+
+      .thumb .thumb-close:hover {
+        transform: scale(1.05);
+        background: rgba(0, 0, 0, 0.65);
+      }
+
       .placeholder {
         color: var(--muted);
         font-size: 14px;
@@ -758,6 +781,7 @@
             :key="item.id"
             @click="openPreview(idx)"
           >
+            <button class="thumb-close" @click.stop="deleteResult(item.id)">×</button>
             <img :src="item.image" :alt="`${t('results.title')} ${idx + 1}`" />
             <div class="tag">{{ item.meta.width }}×{{ item.meta.height }}</div>
           </div>
@@ -1404,6 +1428,25 @@
             }
           };
 
+          const deleteResult = (id) => {
+            const idx = results.value.findIndex((r) => r.id === id);
+            if (idx === -1) return;
+            const next = results.value.filter((r) => r.id !== id);
+            results.value = next;
+            if (previewOpen.value && previewSource.value === "results") {
+              if (!next.length) {
+                previewOpen.value = false;
+                selectedImage.value = "";
+                selectedIndex.value = 0;
+                return;
+              }
+              if (selectedIndex.value >= next.length) {
+                selectedIndex.value = next.length - 1;
+              }
+              selectedImage.value = next[selectedIndex.value]?.image || "";
+            }
+          };
+
 
           const requestStop = () => {
             if (loading.value || batchRunning.value) {
@@ -1767,6 +1810,7 @@
             toggleAutoUpscale,
             magnifierEnabled,
             toggleMagnifier,
+            deleteResult,
           };
         },
       }).mount("#app");

@@ -16,7 +16,7 @@ async def main():
         browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
         page = await browser.new_page(viewport={"width": 1280, "height": 800})
         page.on("console", lambda msg: print(f"[browser] {msg.type} {msg.text}"))
-        page.on("requestfailed", lambda req: print(f"[browser][requestfailed] {req.url} {req.failure()}"))
+        page.on("requestfailed", lambda req: print(f"[browser][requestfailed] {req.url} {req.failure}"))
         await page.goto(URL, wait_until="domcontentloaded", timeout=15000)
 
         results = []

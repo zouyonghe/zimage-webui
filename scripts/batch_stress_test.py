@@ -17,56 +17,65 @@ async def main():
         page = await browser.new_page(viewport={"width": 1280, "height": 800})
         page.on("console", lambda msg: print(f"[browser] {msg.type} {msg.text}"))
         await page.goto(URL, wait_until="domcontentloaded", timeout=15000)
-        results = await page.evaluate(
-            """
-            async (total) => {
-              const results = [];
-              for (let i = 0; i < total; i += 1) {
-                console.log(`running ${i+1}/${total}`);
-                const seed = Math.floor(Math.random() * 1000000);
-                const payload = {
-                  prompt: 'a cat sitting on a chair, high quality, detailed',
-                  negative_prompt: 'low quality, blurry',
-                  steps: 9,
-                  guidance: 0.0,
-                  height: 512,
-                  width: 512,
-                  seed,
-                };
-                const t0 = performance.now();
-                try {
-                  const res = await fetch('/generate_stream', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                  });
-                  if (!res.ok || !res.body) {
-                    results.push({ ok: false, status: res.status, dt: performance.now() - t0, err: 'no body' });
-                    continue;
-                  }
-                  const reader = res.body.getReader();
-                  const decoder = new TextDecoder();
-                  let buffer = '';
-                  let complete = false;
-                  while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    buffer += decoder.decode(value, { stream: true });
-                    if (buffer.includes('\\nevent: complete\\n')) {
-                      complete = true;
-                      break;
-                    }
-                  }
-                  results.push({ ok: complete, status: res.status, dt: performance.now() - t0, err: complete ? '' : 'closed before complete' });
-                } catch (e) {
-                  results.push({ ok: false, status: null, dt: performance.now() - t0, err: String(e) });
-                }
-              }
-              return results;
-            }
-            """,
-            TOTAL,
-        )
+
+        results = []
+        for i in range(TOTAL):
+            print(f"running {i+1}/{TOTAL} ...", flush=True)
+            try:
+                res = await asyncio.wait_for(
+                    page.evaluate(
+                        """
+                        async () => {
+                          const seed = Math.floor(Math.random() * 1000000);
+                          const payload = {
+                            prompt: 'a cat sitting on a chair, high quality, detailed',
+                            negative_prompt: 'low quality, blurry',
+                            steps: 9,
+                            guidance: 0.0,
+                            height: 512,
+                            width: 512,
+                            seed,
+                          };
+                          const t0 = performance.now();
+                          try {
+                            const controller = new AbortController();
+                            const timeout = setTimeout(() => controller.abort(), 15000);
+                            const res = await fetch('/generate_stream', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify(payload),
+                              signal: controller.signal,
+                            });
+                            clearTimeout(timeout);
+                            if (!res.ok || !res.body) {
+                              return { ok: false, status: res.status, dt: performance.now() - t0, err: 'no body' };
+                            }
+                            const reader = res.body.getReader();
+                            const decoder = new TextDecoder();
+                            let buffer = '';
+                            let complete = false;
+                            while (true) {
+                              const { value, done } = await reader.read();
+                              if (done) break;
+                              buffer += decoder.decode(value, { stream: true });
+                              if (buffer.includes('\\nevent: complete\\n')) {
+                                complete = true;
+                                break;
+                              }
+                            }
+                            return { ok: complete, status: res.status, dt: performance.now() - t0, err: complete ? '' : 'closed before complete' };
+                          } catch (e) {
+                            return { ok: false, status: null, dt: performance.now() - t0, err: String(e) };
+                          }
+                        }
+                        """,
+                    ),
+                    timeout=20,
+                )
+            except asyncio.TimeoutError:
+                res = {"ok": False, "status": None, "dt": 20000, "err": "python-timeout"}
+            results.append(res)
+
         await browser.close()
 
     succ = sum(1 for r in results if r.get("ok"))

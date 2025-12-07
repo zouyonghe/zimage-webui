@@ -1,4 +1,6 @@
-# Z-Image WebUI
+# Z-Image WebUI / 多语言说明
+
+Languages: 简体中文 / English / 日本語
 
 基于本地权重的轻量 Web UI，提供分辨率预设、连续批量生成和自动落盘保存等功能。
 

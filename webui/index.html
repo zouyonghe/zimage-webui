@@ -1378,13 +1378,6 @@
               const newItem = { id, image: data.image, meta };
               const nextResults = [...results.value, newItem].slice(-12);
               results.value = nextResults;
-              if (!autoUpscaleEnabled.value) {
-                const lastIdx = nextResults.length - 1;
-                previewSource.value = "results";
-                selectedIndex.value = lastIdx;
-                selectedImage.value = data.image;
-                previewOpen.value = true;
-              }
               addToHistory({ image: data.image, meta: { ...meta, scale: meta.applied_scale || meta.scale || scale } });
             } catch (err) {
               upscaleError.value = err.message || "";
@@ -1395,7 +1388,7 @@
 
           const triggerAutoUpscale = () => {
             if (!autoUpscaleEnabled.value || upscaleLoading.value) return;
-            const latest = results.value[0];
+            const latest = results.value[results.value.length - 1];
             if (!latest || latest.meta?.type === "upscale") return;
             if (lastAutoBaseId.value === latest.id) return;
             lastAutoBaseId.value = latest.id;

@@ -1150,6 +1150,27 @@
     <script type="module">
       import { createApp, ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
       import ElementPlus from "element-plus";
+      // Fallback DOM sync to hard-align card heights after Vue render
+      const syncCardsDom = () => {
+        const promptEl = document.querySelector("section.card");
+        if (!promptEl) return;
+        const rect = promptEl.getBoundingClientRect();
+        const height = rect.height || 0;
+        if (!height) return;
+        const targets = document.querySelectorAll("section.card-scroll");
+        targets.forEach((el) => {
+          el.style.height = `${height}px`;
+          el.style.minHeight = `${height}px`;
+          el.style.maxHeight = `${height}px`;
+          el.style.overflow = "auto";
+        });
+      };
+      window.addEventListener("load", () => {
+        syncCardsDom();
+        setTimeout(syncCardsDom, 400);
+        setTimeout(syncCardsDom, 800);
+      });
+      window.addEventListener("resize", () => requestAnimationFrame(syncCardsDom));
 
       const DEFAULT_PROMPT = "a cat sitting on a chair, high quality, detailed";
       const STREAM_TIMEOUT_MS = 10000; // 10 seconds per stream request
@@ -1528,25 +1549,34 @@
           const syncCardHeight = () => {
             const fallback = computeAvailableHeight();
             if (!promptCardRef.value) {
-              syncedCardHeight.value = fallback;
+              syncedCardHeight.value = Math.max(syncedCardHeight.value || 0, fallback);
               return;
             }
             const rect = promptCardRef.value.getBoundingClientRect();
             const style = window.getComputedStyle(promptCardRef.value);
             const margins =
               parseFloat(style.marginTop || "0") + parseFloat(style.marginBottom || "0");
-            const h = rect.height + margins;
-            syncedCardHeight.value = h || fallback;
+            const contentHeight = Math.max(promptCardRef.value.scrollHeight || 0, rect.height || 0);
+            const h = contentHeight + margins;
+            const current = syncedCardHeight.value || 0;
+            const next = h || current || fallback;
+            syncedCardHeight.value = Math.max(next, current, fallback);
+            if (typeof window !== "undefined") {
+              window.__cardHeightDebug = { h, fallback, current, next, synced: syncedCardHeight.value };
+            }
           };
           const syncCardHeightSoft = () => {
-            // Schedule a few extra syncs to catch late layout changes (fonts, async Vue mount)
             syncCardHeight();
+            let last = syncedCardHeight.value;
             let count = 0;
-            const maxTicks = 6;
+            const maxTicks = 12;
             const tick = () => {
-              if (count >= maxTicks) return;
-              count += 1;
               syncCardHeight();
+              const next = syncedCardHeight.value;
+              const stable = Math.abs(next - last) < 1;
+              last = next;
+              count += 1;
+              if (stable || count >= maxTicks) return;
               requestAnimationFrame(tick);
             };
             requestAnimationFrame(tick);
@@ -1560,7 +1590,7 @@
               if (promptResizeObserver && el) {
                 promptResizeObserver.observe(el);
               }
-              nextTick(syncCardHeight);
+              nextTick(syncCardHeightSoft);
             },
             { immediate: true }
           );
@@ -1569,6 +1599,7 @@
             const measured = syncedCardHeight.value;
             const base = measured > 0 ? measured : available;
             return {
+              minHeight: `${base}px`,
               height: `${base}px`,
               overflow: "auto"
             };
@@ -1667,7 +1698,7 @@
             (lang) => {
               document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
               nextTick(syncThemeWidth);
-              nextTick(syncCardHeight);
+              nextTick(syncCardHeightSoft);
             },
             { immediate: true }
           );
@@ -1681,6 +1712,10 @@
             window.addEventListener('resize', syncThemeWidth);
             nextTick(syncCardHeightSoft);
             window.addEventListener('resize', syncCardHeightSoft);
+            window.addEventListener('load', syncCardHeightSoft);
+            if (document.fonts && document.fonts.ready) {
+              document.fonts.ready.then(() => syncCardHeightSoft());
+            }
             if (window.ResizeObserver) {
               promptResizeObserver = new ResizeObserver(() => syncCardHeightSoft());
               if (promptCardRef.value) {
@@ -1690,11 +1725,13 @@
             // Extra ticks to catch late font/layout changes
             setTimeout(syncCardHeightSoft, 80);
             setTimeout(syncCardHeightSoft, 200);
+            setTimeout(syncCardHeightSoft, 400);
           });
           onBeforeUnmount(() => {
             document.removeEventListener('click', handleClickOutside);
             window.removeEventListener('resize', syncThemeWidth);
             window.removeEventListener('resize', syncCardHeightSoft);
+            window.removeEventListener('load', syncCardHeightSoft);
             if (promptResizeObserver && promptResizeObserver.disconnect) {
               promptResizeObserver.disconnect();
             }
@@ -1705,7 +1742,7 @@
               applyTheme(key);
               localStorage.setItem('zimage-theme', key);
               nextTick(syncThemeWidth);
-              nextTick(syncCardHeight);
+              nextTick(syncCardHeightSoft);
             },
             { immediate: true }
           );
@@ -1723,15 +1760,15 @@
               upscaleScale.value,
               autoUpscaleEnabled.value,
             ],
-            () => nextTick(syncCardHeight)
+            () => nextTick(syncCardHeightSoft)
           );
           watch(
             () => results.value.length,
-            () => nextTick(syncCardHeight)
+            () => nextTick(syncCardHeightSoft)
           );
           watch(
             () => history.value.length,
-            () => nextTick(syncCardHeight)
+            () => nextTick(syncCardHeightSoft)
           );
           const ratios = [
             { label: "1:1 512", width: 512, height: 512 },

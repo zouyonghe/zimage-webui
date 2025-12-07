@@ -8,7 +8,7 @@ async def main():
         browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
         page = await browser.new_page(viewport={"width": 1440, "height": 900})
         await page.goto(URL, wait_until="networkidle", timeout=15000)
-        await page.wait_for_timeout(1500)
+        await page.wait_for_timeout(1000)
 
         cards = await page.evaluate(
             "() => Array.from(document.querySelectorAll('section.card')).map(el => ({"

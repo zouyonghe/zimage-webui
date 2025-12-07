@@ -1173,7 +1173,7 @@
       window.addEventListener("resize", () => requestAnimationFrame(syncCardsDom));
 
       const DEFAULT_PROMPT = "a cat sitting on a chair, high quality, detailed";
-      const STREAM_TIMEOUT_MS = 10000; // 10 seconds per stream request
+      const STREAM_TIMEOUT_MS = 60000; // allow slower generations per stream request (60s)
 
       createApp({
         setup() {

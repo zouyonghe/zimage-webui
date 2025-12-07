@@ -1957,11 +1957,13 @@
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             let buffer = "";
+            let lastEventAt = Date.now();
 
             const cleanup = () => clearTimeout(timeout);
 
             const promise = new Promise((resolve, reject) => {
               const handleEvent = (eventName, data) => {
+                lastEventAt = Date.now();
                 if (eventName === "progress") {
                   const step = Number(data?.step || 0);
                   const total = Number(data?.total_steps || payload.steps || steps.value || 0);
@@ -2010,6 +2012,10 @@
               const pump = async () => {
                 try {
                   while (true) {
+                    // watchdog: if no event in STREAM_TIMEOUT_MS, abort
+                    if (Date.now() - lastEventAt > STREAM_TIMEOUT_MS) {
+                      throw new Error("stream timeout");
+                    }
                     const { value, done } = await reader.read();
                     if (done) break;
                     buffer += decoder.decode(value, { stream: true });
@@ -2031,11 +2037,12 @@
               return await promise;
             } catch (err) {
               clearFakeProgress();
+              const aborted = controller.signal.aborted || /timeout/i.test(err?.message || "");
               // 流式失败兜底走非流式接口，避免批量中断
               try {
                 return await fallbackGenerateOnce(payload);
               } catch (fallbackErr) {
-                if (controller.signal.aborted) {
+                if (aborted) {
                   throw new Error(t('status.generating') + " timeout");
                 }
                 throw fallbackErr;

@@ -675,6 +675,8 @@ class WebUIHandler(SimpleHTTPRequestHandler):
         self.send_header("Connection", "keep-alive")
         self.end_headers()
 
+        print("[SSE] start /generate_stream", {'seed': seed, 'size': f"{width}x{height}"})
+
         print(
             f"[SSE] Generating image | prompt='{prompt}' steps={steps} guidance={guidance} size={width}x{height} seed={seed} device={device}"
         )

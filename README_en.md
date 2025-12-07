@@ -1,7 +1,5 @@
 # Z-Image WebUI
 
-Languages: zh / en / ja
-
 Lightweight local Web UI for Z-Image with aspect presets, batch generation, auto-save, hi-res upscale, and magnifier.
 
 ## Feature Overview

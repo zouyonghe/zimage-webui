@@ -15,7 +15,7 @@ async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
         page = await browser.new_page(viewport={"width": 1280, "height": 800})
-        page.on("console", lambda msg: print(f"[browser] {msg.type()} {msg.text}"))
+        page.on("console", lambda msg: print(f"[browser] {msg.type} {msg.text}"))
         await page.goto(URL, wait_until="domcontentloaded", timeout=15000)
         results = await page.evaluate(
             """

@@ -13,15 +13,20 @@
     />
     <style>
       :root {
-        --bg: #0f172a;
+        --bg-base: #0f172a;
+        --bg-1: #1e293b;
+        --bg-2: #1d1b2f;
         --panel: rgba(255, 255, 255, 0.06);
         --panel-strong: rgba(255, 255, 255, 0.12);
+        --panel-soft: rgba(255, 255, 255, 0.04);
+        --input-bg: rgba(255, 255, 255, 0.06);
         --accent: #7c3aed;
         --accent-2: #22d3ee;
         --text: #e2e8f0;
         --muted: #94a3b8;
         --success: #4ade80;
         --danger: #f87171;
+        --shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
       }
 
       * {
@@ -33,10 +38,11 @@
         min-height: 100vh;
         font-family: "Space Grotesk", "Inter", system-ui, -apple-system, sans-serif;
         color: var(--text);
-        background: radial-gradient(circle at 20% 20%, #1e293b, #0f172a 40%),
-          radial-gradient(circle at 80% 30%, #1d1b2f, #0f172a 45%),
-          #0f172a;
+        background: radial-gradient(circle at 20% 20%, var(--bg-1), var(--bg-base) 40%),
+          radial-gradient(circle at 80% 30%, var(--bg-2), var(--bg-base) 45%),
+          var(--bg-base);
         padding: 32px;
+        transition: background 0.3s ease, color 0.3s ease;
       }
 
       .layout {
@@ -86,7 +92,8 @@
         border-radius: 16px;
         padding: 18px;
         backdrop-filter: blur(10px);
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+        box-shadow: var(--shadow);
+        transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
       }
 
       .card h2 {
@@ -106,7 +113,7 @@
       textarea,
       select {
         width: 100%;
-        background: rgba(255, 255, 255, 0.06);
+        background: var(--input-bg);
         border: 1px solid var(--panel-strong);
         border-radius: 12px;
         color: var(--text);
@@ -231,7 +238,7 @@
         border-radius: 12px;
         overflow: hidden;
         position: relative;
-        background: rgba(255, 255, 255, 0.02);
+        background: var(--panel-soft);
         cursor: zoom-in;
         transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
       }
@@ -287,7 +294,7 @@
         width: 52px;
         height: 52px;
         border-radius: 50%;
-        border: 4px solid rgba(255, 255, 255, 0.08);
+        border: 4px solid var(--panel-strong);
         border-top-color: var(--accent);
         animation: spin 0.8s linear infinite;
       }
@@ -311,7 +318,7 @@
         gap: 6px;
         padding: 6px 10px;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.06);
+        background: var(--panel);
         border: 1px solid var(--panel-strong);
         font-size: 12px;
       }
@@ -324,7 +331,7 @@
       }
 
       .chip {
-        background: rgba(255, 255, 255, 0.08);
+        background: var(--panel-soft);
         border: 1px solid var(--panel-strong);
         color: var(--text);
         padding: 8px 10px;
@@ -353,7 +360,7 @@
         padding: 10px;
         border-radius: 12px;
         border: 1px solid var(--panel-strong);
-        background: rgba(255, 255, 255, 0.04);
+        background: var(--panel-soft);
         align-items: center;
         cursor: zoom-in;
         transition: border-color 0.15s ease, transform 0.1s ease;
@@ -501,7 +508,26 @@
       }
 
       .lang-btn:hover:not(.active) {
-        background: rgba(255, 255, 255, 0.1);
+        background: var(--panel);
+        color: var(--text);
+      }
+
+      .theme-switch {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--panel);
+        border: 1px solid var(--panel-strong);
+        border-radius: 12px;
+        padding: 6px 10px;
+      }
+
+      .theme-switch select {
+        border: none;
+        background: transparent;
+        padding-left: 2px;
+        width: auto;
+        min-width: 150px;
         color: var(--text);
       }
 
@@ -585,6 +611,14 @@
           </div>
         </div>
         <div style="display: flex; align-items: center; gap: 12px">
+          <div class="theme-switch">
+            <span style="color: var(--muted); font-size: 14px;">{{ t('theme.label') }}</span>
+            <select v-model="activeTheme">
+              <option v-for="theme in themeOptions" :key="theme.key" :value="theme.key">
+                {{ t(theme.labelKey) }}
+              </option>
+            </select>
+          </div>
           <div class="language-switch">
             <button
               class="lang-btn"
@@ -942,7 +976,13 @@
               'history.guidance': '引导',
               'history.seed': '种子',
               'history.size': '尺寸',
-              'history.negative': '负面'
+              'history.negative': '负面',
+              'theme.label': '主题',
+              'theme.midnight': '夜间·深蓝',
+              'theme.dawn': '白天·晨光',
+              'theme.sunset': '夜间·落日',
+              'theme.glacier': '白天·冰蓝',
+              'theme.forest': '夜间·森野'
             },
             en: {
               'header.subtitle': 'Enter prompts to generate high-quality images online',
@@ -1003,7 +1043,13 @@
               'history.guidance': 'Guidance',
               'history.seed': 'Seed',
               'history.size': 'Size',
-              'history.negative': 'Negative'
+              'history.negative': 'Negative',
+              'theme.label': 'Theme',
+              'theme.midnight': 'Midnight (Dark)',
+              'theme.dawn': 'Dawn (Light)',
+              'theme.sunset': 'Sunset Neon (Dark)',
+              'theme.glacier': 'Glacier (Light)',
+              'theme.forest': 'Forest (Dark)'
             },
             ja: {
               'header.subtitle': 'プロンプトを入力して高品質な画像を生成',
@@ -1064,9 +1110,136 @@
               'history.guidance': 'ガイダンス',
               'history.seed': 'シード',
               'history.size': 'サイズ',
-              'history.negative': 'ネガティブ'
+              'history.negative': 'ネガティブ',
+              'theme.label': 'テーマ',
+              'theme.midnight': 'ミッドナイト (ダーク)',
+              'theme.dawn': '夜明け (ライト)',
+              'theme.sunset': 'サンセット (ダーク)',
+              'theme.glacier': 'グレイシャー (ライト)',
+              'theme.forest': 'フォレスト (ダーク)'
             }
           };
+          const themes = {
+            midnight: {
+              mode: "dark",
+              vars: {
+                "bg-base": "#0f172a",
+                "bg-1": "#1e293b",
+                "bg-2": "#1d1b2f",
+                panel: "rgba(255, 255, 255, 0.06)",
+                "panel-strong": "rgba(255, 255, 255, 0.12)",
+                "panel-soft": "rgba(255, 255, 255, 0.04)",
+                "input-bg": "rgba(255, 255, 255, 0.06)",
+                accent: "#7c3aed",
+                "accent-2": "#22d3ee",
+                text: "#e2e8f0",
+                muted: "#94a3b8",
+                success: "#4ade80",
+                danger: "#f87171",
+                shadow: "0 20px 50px rgba(0, 0, 0, 0.25)",
+              },
+            },
+            dawn: {
+              mode: "light",
+              vars: {
+                "bg-base": "#fff7ed",
+                "bg-1": "#fef3c7",
+                "bg-2": "#ffe4e6",
+                panel: "rgba(255, 255, 255, 0.92)",
+                "panel-strong": "rgba(15, 23, 42, 0.12)",
+                "panel-soft": "rgba(15, 23, 42, 0.04)",
+                "input-bg": "rgba(255, 255, 255, 0.92)",
+                accent: "#f97316",
+                "accent-2": "#fbbf24",
+                text: "#0f172a",
+                muted: "#475569",
+                success: "#16a34a",
+                danger: "#dc2626",
+                shadow: "0 14px 34px rgba(15, 23, 42, 0.18)",
+              },
+            },
+            sunset: {
+              mode: "dark",
+              vars: {
+                "bg-base": "#1a1325",
+                "bg-1": "#2b1538",
+                "bg-2": "#3b1225",
+                panel: "rgba(255, 255, 255, 0.05)",
+                "panel-strong": "rgba(255, 255, 255, 0.12)",
+                "panel-soft": "rgba(255, 255, 255, 0.04)",
+                "input-bg": "rgba(255, 255, 255, 0.06)",
+                accent: "#fb7185",
+                "accent-2": "#f97316",
+                text: "#f8fafc",
+                muted: "#e2e8f0",
+                success: "#34d399",
+                danger: "#f87171",
+                shadow: "0 20px 50px rgba(0, 0, 0, 0.35)",
+              },
+            },
+            glacier: {
+              mode: "light",
+              vars: {
+                "bg-base": "#e0f2fe",
+                "bg-1": "#bae6fd",
+                "bg-2": "#c7d2fe",
+                panel: "rgba(255, 255, 255, 0.94)",
+                "panel-strong": "rgba(15, 23, 42, 0.12)",
+                "panel-soft": "rgba(15, 23, 42, 0.05)",
+                "input-bg": "rgba(255, 255, 255, 0.92)",
+                accent: "#0ea5e9",
+                "accent-2": "#22d3ee",
+                text: "#0f172a",
+                muted: "#334155",
+                success: "#16a34a",
+                danger: "#e11d48",
+                shadow: "0 14px 32px rgba(15, 23, 42, 0.16)",
+              },
+            },
+            forest: {
+              mode: "dark",
+              vars: {
+                "bg-base": "#0b1a16",
+                "bg-1": "#123126",
+                "bg-2": "#0f2a2b",
+                panel: "rgba(255, 255, 255, 0.05)",
+                "panel-strong": "rgba(255, 255, 255, 0.12)",
+                "panel-soft": "rgba(255, 255, 255, 0.04)",
+                "input-bg": "rgba(255, 255, 255, 0.06)",
+                accent: "#10b981",
+                "accent-2": "#34d399",
+                text: "#d1fae5",
+                muted: "#9ca3af",
+                success: "#34d399",
+                danger: "#f87171",
+                shadow: "0 20px 50px rgba(0, 0, 0, 0.35)",
+              },
+            },
+          };
+          const themeOptions = [
+            { key: "midnight", labelKey: "theme.midnight" },
+            { key: "dawn", labelKey: "theme.dawn" },
+            { key: "sunset", labelKey: "theme.sunset" },
+            { key: "glacier", labelKey: "theme.glacier" },
+            { key: "forest", labelKey: "theme.forest" },
+          ];
+          const activeTheme = ref(localStorage.getItem('zimage-theme') || 'midnight');
+          const applyTheme = (key) => {
+            const theme = themes[key] || themes.midnight;
+            Object.entries(theme.vars).forEach(([name, value]) => {
+              document.documentElement.style.setProperty(`--${name}`, value);
+            });
+            document.documentElement.setAttribute("data-theme", key);
+            document.documentElement.style.colorScheme = theme.mode === "light" ? "light" : "dark";
+          };
+          watch(
+            activeTheme,
+            (key) => {
+              applyTheme(key);
+              localStorage.setItem('zimage-theme', key);
+            },
+            { immediate: true }
+          );
           const prompt = ref(DEFAULT_PROMPT);
           const negativePrompt = ref("");
           const steps = ref(9);
@@ -1798,6 +1971,8 @@
             currentLang,
             t,
             switchLanguage,
+            themeOptions,
+            activeTheme,
             requestStop,
             autoUpscaleEnabled,
             toggleAutoUpscale,

@@ -4,6 +4,7 @@ import json
 import os
 import signal
 import sys
+import contextlib
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -415,9 +416,10 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             return
 
         try:
-            # RealESRGAN expects BGR numpy input
+            # RealESRGAN expects BGR numpy input; silence verbose tile logs
             img_np = np.array(image)[:, :, ::-1]
-            output, _ = upscaler.enhance(img_np, outscale=scale)
+            with contextlib.redirect_stdout(io.StringIO()):
+                output, _ = upscaler.enhance(img_np, outscale=scale)
             upscaled = Image.fromarray(output[:, :, ::-1])
         except Exception as exc:  # noqa: BLE001
             self._send_json(500, {"error": f"Upscale failed: {exc}"})

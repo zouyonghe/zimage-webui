@@ -1353,13 +1353,14 @@
               const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
               const newItem = { id, image: data.image, meta };
               const nextResults = [...results.value, newItem].slice(-12);
+              results.value = nextResults;
               if (!autoUpscaleEnabled.value) {
+                const lastIdx = nextResults.length - 1;
                 previewSource.value = "results";
-                selectedIndex.value = 0;
+                selectedIndex.value = lastIdx;
                 selectedImage.value = data.image;
                 previewOpen.value = true;
               }
-              results.value = nextResults;
               addToHistory({ image: data.image, meta: { ...meta, scale: meta.applied_scale || meta.scale || scale } });
             } catch (err) {
               upscaleError.value = err.message || "";

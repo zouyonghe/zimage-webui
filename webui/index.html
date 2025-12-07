@@ -2570,6 +2570,7 @@
             totalWorkUnits.value = count * (autoUpscaleEnabled.value ? 2 : 1);
             completedWorkUnits.value = 0;
             currentWorkPhase.value = "generate";
+            let failedCount = 0;
 
             for (let i = 0; i < count; i += 1) {
               batchCursor.value = i + 1;
@@ -2584,7 +2585,10 @@
                 seed.value = nextSeed; // 保持用户输入的固定种子
               }
               const data = await generateOnce({ ...fixedParams, seed: nextSeed });
-              if (!data || stopRequested.value) break;
+              if (!data) {
+                failedCount += 1;
+              }
+              if (stopRequested.value) break;
               if (autoUpscaleEnabled.value) {
                 const sourcePayload = { image: data.image, meta: data.meta || {} };
                 await upscaleImage({ auto: true, sourceOverride: sourcePayload });
@@ -2598,6 +2602,9 @@
             batchTotal.value = 0;
             stopRequested.value = false;
             finalizeWork();
+            if (failedCount > 0) {
+              error.value = `有 ${failedCount} 张生成失败`;
+            }
             return true;
           };
 

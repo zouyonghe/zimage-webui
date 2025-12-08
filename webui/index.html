@@ -71,6 +71,7 @@
       }
       .prompt-card {
         grid-area: prompt;
+        min-height: 360px;
       }
       .results-card {
         grid-area: results;
@@ -160,6 +161,36 @@
         margin: 12px 0 4px;
         color: var(--muted);
         font-size: 14px;
+      }
+
+      .label-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .inline-action {
+        background: transparent;
+        color: var(--muted);
+        padding: 6px 10px;
+        border-radius: 10px;
+        border: 1px solid var(--panel-strong);
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+        transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+      }
+
+      .inline-action:hover:not(:disabled) {
+        color: var(--text);
+        border-color: var(--accent);
+        background: var(--panel-soft);
+      }
+
+      .inline-action:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
       }
 
       input,
@@ -914,14 +945,20 @@
       <main class="layout">
       <section class="card prompt-card" ref="promptCardRef">
         <h2>{{ t('prompt.title') }}</h2>
-        <label for="prompt">{{ t('prompt.title') }}</label>
+        <div class="label-row">
+          <label for="prompt">{{ t('prompt.title') }}</label>
+          <button class="inline-action" :disabled="!prompt" @click="clearPrompt">{{ t('prompt.clear') }}</button>
+        </div>
         <textarea
           id="prompt"
           v-model="prompt"
           :placeholder="t('prompt.placeholder')"
         ></textarea>
 
-        <label for="negative">{{ t('negative.title') }}</label>
+        <div class="label-row">
+          <label for="negative">{{ t('negative.title') }}</label>
+          <button class="inline-action" :disabled="!negativePrompt" @click="clearNegativePrompt">{{ t('negative.clear') }}</button>
+        </div>
         <textarea
           id="negative"
           v-model="negativePrompt"
@@ -1103,7 +1140,6 @@
               <img class="history-thumb" :src="item.image" alt="历史缩略图" />
               <div>
                 <div class="history-meta">
-                  {{ item.prompt }}
                 <div>{{ t('history.steps') }}: {{ item.steps }} | {{ t('history.guidance') }}: {{ item.guidance }} | {{ t('history.seed') }}: {{ item.seed ?? t('seed.placeholder') }}</div>
                 <div>{{ t('history.size') }}: {{ item.width }}×{{ item.height }}</div>
                 <div v-if="item.negative">{{ t('history.negative') }}: {{ item.negative }}</div>
@@ -1140,7 +1176,6 @@
             @mousemove="onMagnifierMove"
             @mouseleave="hideMagnifier"
             @click.left.stop="nextImage"
-            @contextmenu.prevent.stop="prevImage"
           />
           <div
             class="thumb-info"
@@ -1216,8 +1251,10 @@
               'prompt.title': '提示词与参数',
               'prompt.title_simple': '提示词',
               'prompt.placeholder': '描述你想生成的画面...',
+              'prompt.clear': '清空',
               'negative.title': '负面提示词',
               'negative.placeholder': '不想出现的元素，例如：low quality, blurry, watermark',
+              'negative.clear': '清空',
               'steps.label': '采样步数',
               'guidance.label': '引导强度',
               'height.label': '高度 (px)',
@@ -1287,8 +1324,10 @@
               'prompt.title': 'Prompt & Parameters',
               'prompt.title_simple': 'Prompt',
               'prompt.placeholder': 'Describe the image you want to generate...',
+              'prompt.clear': 'Clear',
               'negative.title': 'Negative Prompt',
               'negative.placeholder': 'Elements to avoid, e.g.: low quality, blurry, watermark',
+              'negative.clear': 'Clear',
               'steps.label': 'Sampling Steps',
               'guidance.label': 'Guidance Scale',
               'height.label': 'Height (px)',
@@ -1358,8 +1397,10 @@
               'prompt.title': 'プロンプトとパラメータ',
               'prompt.title_simple': 'プロンプト',
               'prompt.placeholder': '生成したい画像を説明してください...',
+              'prompt.clear': 'クリア',
               'negative.title': 'ネガティブプロンプト',
               'negative.placeholder': '含めたくない要素 例: low quality, blurry, watermark',
+              'negative.clear': 'クリア',
               'steps.label': 'サンプリングステップ',
               'guidance.label': 'ガイダンス強度',
               'height.label': '高さ (px)',
@@ -1595,8 +1636,7 @@
             if (!promptCardRef.value) return;
             const rect = promptCardRef.value.getBoundingClientRect();
             const measured = Math.max(rect.height || 0, promptCardRef.value.scrollHeight || 0);
-            const fallback = Math.max(360, (window.innerHeight || 0) - 180);
-            const next = Math.max(measured, fallback);
+            const next = Math.max(measured, 360);
             if (Math.abs((promptCardHeight.value || 0) - next) > 1) {
               promptCardHeight.value = next;
             }
@@ -1992,6 +2032,14 @@
             autoUpscaleEnabled.value = false;
             lastAutoBaseId.value = "";
             stepProgress.value = { current: 0, total: 0 };
+          };
+
+          const clearPrompt = () => {
+            prompt.value = "";
+          };
+
+          const clearNegativePrompt = () => {
+            negativePrompt.value = "";
           };
 
           const randomizeSeed = () => {
@@ -2817,7 +2865,9 @@
 
           return {
             prompt,
+            clearPrompt,
             negativePrompt,
+            clearNegativePrompt,
             steps,
             guidance,
             height,

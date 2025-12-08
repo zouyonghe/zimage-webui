@@ -1232,6 +1232,8 @@
               'status.generating': '正在生成...',
               'status.batchGenerating': '正在生成...',
               'status.stopRequested': '已请求停止，当前图片完成后终止',
+              'status.fallbackGenerate': '已回退到非流式生成',
+              'status.fallbackUpscale': '已回退到非流式放大',
               'status.loadFailed': '加载失败',
               'status.completed': '生成完成',
               'stop.button': '停止生成',
@@ -1300,6 +1302,8 @@
               'status.generating': 'Generating...',
               'status.batchGenerating': 'Generating...',
               'status.stopRequested': 'Stop requested; will halt after current image',
+              'status.fallbackGenerate': 'Fell back to non-stream generation',
+              'status.fallbackUpscale': 'Fell back to non-stream upscale',
               'status.loadFailed': 'Load failed',
               'status.completed': 'Generation completed',
               'stop.button': 'Stop',
@@ -1368,6 +1372,8 @@
               'status.generating': '生成中...',
               'status.batchGenerating': '生成中...',
               'status.stopRequested': '停止をリクエストしました。現在の画像が終わったら停止',
+              'status.fallbackGenerate': 'ストリーム生成から通常モードにフォールバックしました',
+              'status.fallbackUpscale': 'ストリーム放大から通常モードにフォールバックしました',
               'status.loadFailed': '読み込み失敗',
               'status.completed': '生成完了',
               'stop.button': '停止',
@@ -1565,6 +1571,20 @@
             completedWorkUnits.value = Math.max(completedWorkUnits.value, totalWorkUnits.value);
             totalWorkUnits.value = 0;
             currentWorkPhase.value = "";
+          };
+          const fallbackStatus = ref("");
+          let fallbackStatusTimer = null;
+          const setFallbackStatus = (msg = "") => {
+            fallbackStatus.value = msg;
+            if (fallbackStatusTimer) {
+              clearTimeout(fallbackStatusTimer);
+              fallbackStatusTimer = null;
+            }
+            if (msg) {
+              fallbackStatusTimer = setTimeout(() => {
+                fallbackStatus.value = "";
+              }, 4000);
+            }
           };
           const showInfoOverlay = ref(false);
           const upscaleScale = ref(2.0);
@@ -1792,6 +1812,7 @@
             if (modelError.value) return `${t('status.loadFailed')}: ${modelError.value}`;
             if (error.value) return `⚠ ${error.value}`;
             if (upscaleError.value) return `⚠ ${upscaleError.value}`;
+            if (fallbackStatus.value) return fallbackStatus.value;
             if (upscaleLoading.value) return `${t('upscale.running')}...`;
             if (stopRequested.value && (loading.value || batchRunning.value)) return t('status.stopRequested');
             if (batchRunning.value) return t('status.batchGenerating');
@@ -2026,7 +2047,9 @@
               clearFakeProgress();
               const aborted = controller.signal.aborted || /abort|timeout/i.test(err?.message || "");
               try {
-                return await fallbackGenerateOnce(payload);
+                const data = await fallbackGenerateOnce(payload);
+                setFallbackStatus(t('status.fallbackGenerate'));
+                return data;
               } catch (fallbackErr) {
                 if (aborted) {
                   throw new Error(t('status.generating') + " timeout");
@@ -2284,7 +2307,9 @@
               const aborted = controller.signal.aborted || /abort|timeout/i.test(err?.message || "");
               // fallback to non-stream upscale on any failure (including timeout)
               try {
-                return await fallbackUpscaleOnce(payload);
+                const data = await fallbackUpscaleOnce(payload);
+                setFallbackStatus(t('status.fallbackUpscale'));
+                return data;
               } catch (fallbackErr) {
                 const message = aborted ? `${t('upscale.running')} timeout` : (fallbackErr?.message || err?.message || "Upscale failed");
                 throw new Error(message);

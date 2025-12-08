@@ -7,6 +7,7 @@ import signal
 import sys
 import contextlib
 import inspect
+import uuid
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -66,6 +67,7 @@ UPSCALE_TILE = int(os.environ.get("ZIMAGE_UPSCALE_TILE", 256))
 UPSCALE_TILE_PAD = int(os.environ.get("ZIMAGE_UPSCALE_TILE_PAD", 10))
 UPSCALE_MAX_CONCURRENCY = int(os.environ.get("ZIMAGE_UPSCALE_CONCURRENCY", 1))
 UPSCALE_WAIT_TIMEOUT = int(os.environ.get("ZIMAGE_UPSCALE_WAIT_TIMEOUT", 60))  # seconds
+UPSCALE_DEFAULT_FORMAT = os.environ.get("ZIMAGE_UPSCALE_FORMAT", "png").lower()
 
 
 def clamp_resolution(height: int, width: int) -> Tuple[int, int]:
@@ -108,13 +110,23 @@ _UPSCALER_ERROR = None
 _UPSCALE_SEMAPHORE = Semaphore(max(1, UPSCALE_MAX_CONCURRENCY))
 
 
-def _save_png_async(image: Image.Image, path: Path, *, compress_level: int = 3) -> None:
-    """Save PNG asynchronously to avoid blocking the response."""
+def _new_request_id() -> str:
+    return uuid.uuid4().hex[:8]
+
+
+def _save_image_async(image: Image.Image, path: Path, *, fmt: str = "png", compress_level: int = 1, quality: int = 92) -> None:
+    """Save image asynchronously to avoid blocking the response."""
 
     def _worker():
         try:
             OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-            image.save(path, format="PNG", compress_level=compress_level)
+            kwargs = {}
+            fmt_local = fmt.upper()
+            if fmt_local == "PNG":
+                kwargs["compress_level"] = compress_level
+            elif fmt_local in {"JPEG", "WEBP"}:
+                kwargs["quality"] = quality
+            image.save(path, format=fmt_local, **kwargs)
         except Exception as exc:  # noqa: BLE001
             print(f"Failed to save upscaled image: {exc}")
 
@@ -234,6 +246,48 @@ def _acquire_upscale_slot() -> bool:
 def _release_upscale_slot(acquired: bool):
     if acquired:
         _UPSCALE_SEMAPHORE.release()
+
+
+def _select_upscale_tile(max_edge: int) -> Tuple[int, int]:
+    """Select tile/pad based on target size to balance speed vs memory."""
+    tile = UPSCALE_TILE
+    if max_edge >= 3500:
+        tile = min(tile, 128)
+    elif max_edge >= 3000:
+        tile = min(tile, 160)
+    elif max_edge >= 2500:
+        tile = min(tile, 192)
+    elif max_edge >= 2000:
+        tile = min(tile, 224)
+    else:
+        tile = min(tile, 256)
+    pad = min(UPSCALE_TILE_PAD, max(4, tile // 8))
+    return tile, pad
+
+
+def _validate_image_format(fmt: str) -> str:
+    allowed = {"png", "jpeg", "jpg", "webp"}
+    fmt = (fmt or "png").lower()
+    if fmt not in allowed:
+        return "png"
+    if fmt == "jpg":
+        fmt = "jpeg"
+    return fmt
+
+
+def _encode_image(image: Image.Image, fmt: str) -> Tuple[str, str]:
+    """Encode image to base64 string and return (data_url, mime)."""
+    fmt = _validate_image_format(fmt)
+    mime = "image/png" if fmt == "png" else f"image/{fmt}"
+    params = {}
+    if fmt in {"jpeg", "webp"}:
+        params.update({"quality": 92, "optimize": False})
+    if fmt == "png":
+        params.update({"compress_level": 1})
+    buffer = io.BytesIO()
+    image.save(buffer, format=fmt.upper(), **params)
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:{mime};base64,{encoded}", mime
 
 
 def _wait_for_upscale_slot(timeout: int, sse_emit=None) -> bool:
@@ -449,28 +503,33 @@ class WebUIHandler(SimpleHTTPRequestHandler):
         self._send_json(200, response)
 
     def _handle_upscale(self, payload: dict):
+        req_id = _new_request_id()
         try:
             image_b64 = payload.get("image")
             scale = float(payload.get("scale", 2.0))
+            out_format = str(payload.get("format", UPSCALE_DEFAULT_FORMAT)).lower()
+            return_image = payload.get("return_image", True)
+            return_image = False if str(return_image).lower() in {"0", "false", "no"} else bool(return_image)
         except Exception as exc:  # noqa: BLE001
-            self._send_json(400, {"error": f"Invalid parameter type: {exc}"})
+            self._send_json(400, {"error": f"Invalid parameter type: {exc}", "request_id": req_id})
             return
 
         if not image_b64:
-            self._send_json(400, {"error": "image is required"})
+            self._send_json(400, {"error": "image is required", "request_id": req_id})
             return
 
         if scale <= 0:
-            self._send_json(400, {"error": "scale must be positive"})
+            self._send_json(400, {"error": "scale must be positive", "request_id": req_id})
             return
 
         scale = max(1.0, min(scale, MAX_UPSCALE_FACTOR))
+        out_fmt = _validate_image_format(out_format)
 
         try:
             decoded = self._decode_base64_image(image_b64)
             image = Image.open(io.BytesIO(decoded)).convert("RGB")
         except Exception as exc:  # noqa: BLE001
-            self._send_json(400, {"error": f"Invalid image data: {exc}"})
+            self._send_json(400, {"error": f"Invalid image data: {exc}", "request_id": req_id})
             return
 
         src_w, src_h = image.size
@@ -489,15 +548,21 @@ class WebUIHandler(SimpleHTTPRequestHandler):
 
         slot_acquired = _wait_for_upscale_slot(UPSCALE_WAIT_TIMEOUT)
         if not slot_acquired:
-            self._send_json(429, {"error": "Upscale busy, please retry in a moment", "timeout": UPSCALE_WAIT_TIMEOUT})
+            self._send_json(429, {"error": "Upscale busy, please retry in a moment", "timeout": UPSCALE_WAIT_TIMEOUT, "request_id": req_id})
             return
 
         try:
             upscaler, device = get_upscaler()
         except Exception as exc:  # noqa: BLE001
             _release_upscale_slot(slot_acquired)
-            self._send_json(500, {"error": f"Upscale unavailable: {exc}"})
+            self._send_json(500, {"error": f"Upscale unavailable: {exc}", "request_id": req_id})
             return
+
+        max_edge = max(target_w, target_h)
+        tile, pad = _select_upscale_tile(max_edge)
+        upscaler.tile = tile
+        upscaler.tile_pad = pad
+        print(f"[UPSCALE] start req={req_id} size={src_w}x{src_h}->{target_w}x{target_h} scale={scale} fmt={out_fmt} tile={tile} pad={pad}")
 
         try:
             # RealESRGAN expects BGR numpy input; silence verbose tile logs
@@ -507,23 +572,20 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             upscaled = Image.fromarray(output[:, :, ::-1])
         except Exception as exc:  # noqa: BLE001
             _release_upscale_slot(slot_acquired)
-            self._send_json(500, {"error": f"Upscale failed: {exc}"})
+            self._send_json(500, {"error": f"Upscale failed: {exc}", "request_id": req_id})
             return
 
-        buffer = io.BytesIO()
-        upscaled.save(buffer, format="PNG", compress_level=1)
-        encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
-
+        data_url, mime = _encode_image(upscaled, out_fmt)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        file_path = OUTPUT_DIR / f"upscaled_{timestamp}_{target_w}x{target_h}.png"
-        _save_png_async(upscaled, file_path)
+        file_path = OUTPUT_DIR / f"upscaled_{timestamp}_{target_w}x{target_h}.{out_fmt}"
+        _save_image_async(upscaled, file_path, fmt=out_fmt)
 
         _release_upscale_slot(slot_acquired)
 
         self._send_json(
             200,
             {
-                "image": f"data:image/png;base64,{encoded}",
+                "image": data_url if return_image else None,
                 "meta": {
                     "type": "upscale",
                     "source_width": src_w,
@@ -532,24 +594,31 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                     "height": target_h,
                     "applied_scale": scale,
                     "saved_path": str(file_path),
+                    "mime": mime,
+                    "request_id": req_id,
+                    "tile": tile,
                 },
             },
         )
 
     def _handle_upscale_stream(self, payload: dict):
+        req_id = _new_request_id()
         try:
             image_b64 = payload.get("image")
             scale = float(payload.get("scale", 2.0))
+            out_format = str(payload.get("format", UPSCALE_DEFAULT_FORMAT)).lower()
+            return_image = payload.get("return_image", True)
+            return_image = False if str(return_image).lower() in {"0", "false", "no"} else bool(return_image)
         except Exception as exc:  # noqa: BLE001
-            self._send_json(400, {"error": f"Invalid parameter type: {exc}"})
+            self._send_json(400, {"error": f"Invalid parameter type: {exc}", "request_id": req_id})
             return
 
         if not image_b64:
-            self._send_json(400, {"error": "image is required"})
+            self._send_json(400, {"error": "image is required", "request_id": req_id})
             return
 
         if scale <= 0:
-            self._send_json(400, {"error": "scale must be positive"})
+            self._send_json(400, {"error": "scale must be positive", "request_id": req_id})
             return
 
         scale = max(1.0, min(scale, MAX_UPSCALE_FACTOR))
@@ -558,7 +627,7 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             decoded = self._decode_base64_image(image_b64)
             image = Image.open(io.BytesIO(decoded)).convert("RGB")
         except Exception as exc:  # noqa: BLE001
-            self._send_json(400, {"error": f"Invalid image data: {exc}"})
+            self._send_json(400, {"error": f"Invalid image data: {exc}", "request_id": req_id})
             return
 
         src_w, src_h = image.size
@@ -582,29 +651,29 @@ class WebUIHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
         def emit_queued(meta):
-            return self._send_sse_event("queued", {"waited": meta.get("queued_for_seconds", 0), "timeout": UPSCALE_WAIT_TIMEOUT})
+            return self._send_sse_event("queued", {"waited": meta.get("queued_for_seconds", 0), "timeout": UPSCALE_WAIT_TIMEOUT, "request_id": req_id})
 
         slot_acquired = _wait_for_upscale_slot(UPSCALE_WAIT_TIMEOUT, emit_queued)
         if not slot_acquired:
-            self._send_sse_event("error", {"message": "Upscale busy, please retry shortly", "timeout": UPSCALE_WAIT_TIMEOUT})
+            self._send_sse_event("error", {"message": "Upscale busy, please retry shortly", "timeout": UPSCALE_WAIT_TIMEOUT, "request_id": req_id})
             return
 
         try:
             upscaler, device = get_upscaler()
         except Exception as exc:  # noqa: BLE001
             _release_upscale_slot(slot_acquired)
-            self._send_sse_event("error", {"message": f"Upscale unavailable: {exc}"})
+            self._send_sse_event("error", {"message": f"Upscale unavailable: {exc}", "request_id": req_id})
             return
 
         def send_error(message: str):
             try:
-                self._send_sse_event("error", {"message": message})
+                self._send_sse_event("error", {"message": message, "request_id": req_id})
             except BrokenPipeError:
                 return
 
         def send_progress(current: int, total: int):
             try:
-                self._send_sse_event("progress", {"current": current, "total": total})
+                self._send_sse_event("progress", {"current": current, "total": total, "request_id": req_id})
             except BrokenPipeError:
                 raise
 
@@ -640,15 +709,21 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                     except Exception:
                         return
 
+        max_edge = max(target_w, target_h)
+        tile, pad = _select_upscale_tile(max_edge)
+        upscaler.tile = tile
+        upscaler.tile_pad = pad
+
+        out_fmt = _validate_image_format(out_format)
+        print(f"[UPSCALE_STREAM] start req={req_id} size={src_w}x{src_h}->{target_w}x{target_h} scale={scale} fmt={out_fmt} tile={tile} pad={pad}")
+
         try:
-            buffer = io.BytesIO()
             writer = _TileProgressWriter(send_progress)
             with contextlib.redirect_stdout(writer), contextlib.redirect_stderr(writer):
                 img_np = np.array(image)[:, :, ::-1]
                 output, _ = upscaler.enhance(img_np, outscale=scale)
             upscaled = Image.fromarray(output[:, :, ::-1])
-            upscaled.save(buffer, format="PNG", compress_level=1)
-            encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+            data_url, mime = _encode_image(upscaled, out_fmt)
         except BrokenPipeError:
             _release_upscale_slot(slot_acquired)
             return
@@ -658,14 +733,15 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             return
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        file_path = OUTPUT_DIR / f"upscaled_{timestamp}_{target_w}x{target_h}.png"
-        _save_png_async(upscaled, file_path)
+        out_fmt = _validate_image_format(out_format)
+        file_path = OUTPUT_DIR / f"upscaled_{timestamp}_{target_w}x{target_h}.{out_fmt}"
+        _save_image_async(upscaled, file_path, fmt=out_fmt)
 
         try:
             self._send_sse_event(
                 "result",
                 {
-                    "image": f"data:image/png;base64,{encoded}",
+                    "image": data_url if return_image else None,
                     "meta": {
                         "type": "upscale",
                         "source_width": src_w,
@@ -674,10 +750,13 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                         "height": target_h,
                         "applied_scale": scale,
                         "saved_path": str(file_path),
+                        "mime": mime,
+                        "request_id": req_id,
+                        "tile": tile,
                     },
                 },
             )
-            self._send_sse_event("done", {"ok": True})
+            self._send_sse_event("done", {"ok": True, "request_id": req_id})
         except BrokenPipeError:
             return
         finally:

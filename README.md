@@ -34,6 +34,10 @@ cd scripts && bash download_models.sh && cd ..
 ```bash
 python webui_server.py
 # 默认监听 0.0.0.0:9000，可通过环境变量 ZIMAGE_PORT 修改
+
+# 命令行快速生图（使用本地模型）
+python zimage.py                      # 使用默认提示词
+python zimage.py "a scenic mountain"  # 传入自定义提示词
 ```
 
 浏览器打开 `http://localhost:9000`。

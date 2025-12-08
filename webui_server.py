@@ -108,6 +108,19 @@ _UPSCALER_ERROR = None
 _UPSCALE_SEMAPHORE = Semaphore(max(1, UPSCALE_MAX_CONCURRENCY))
 
 
+def _save_png_async(image: Image.Image, path: Path, *, compress_level: int = 3) -> None:
+    """Save PNG asynchronously to avoid blocking the response."""
+
+    def _worker():
+        try:
+            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+            image.save(path, format="PNG", compress_level=compress_level)
+        except Exception as exc:  # noqa: BLE001
+            print(f"Failed to save upscaled image: {exc}")
+
+    Thread(target=_worker, daemon=True).start()
+
+
 def get_pipeline():
     global _PIPE, _DEVICE, _DTYPE, _PIPE_ERROR  # noqa: PLW0603
 
@@ -498,17 +511,12 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             return
 
         buffer = io.BytesIO()
-        upscaled.save(buffer, format="PNG")
+        upscaled.save(buffer, format="PNG", compress_level=1)
         encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
 
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         file_path = OUTPUT_DIR / f"upscaled_{timestamp}_{target_w}x{target_h}.png"
-        try:
-            upscaled.save(file_path, format="PNG")
-        except Exception as exc:  # noqa: BLE001
-            print(f"Failed to save upscaled image: {exc}")
-            file_path = None
+        _save_png_async(upscaled, file_path)
 
         _release_upscale_slot(slot_acquired)
 
@@ -523,7 +531,7 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                     "width": target_w,
                     "height": target_h,
                     "applied_scale": scale,
-                    "saved_path": str(file_path) if file_path else None,
+                    "saved_path": str(file_path),
                 },
             },
         )
@@ -639,7 +647,7 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                 img_np = np.array(image)[:, :, ::-1]
                 output, _ = upscaler.enhance(img_np, outscale=scale)
             upscaled = Image.fromarray(output[:, :, ::-1])
-            upscaled.save(buffer, format="PNG")
+            upscaled.save(buffer, format="PNG", compress_level=1)
             encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
         except BrokenPipeError:
             _release_upscale_slot(slot_acquired)
@@ -649,14 +657,9 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             send_error(f"Upscale failed: {exc}")
             return
 
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         file_path = OUTPUT_DIR / f"upscaled_{timestamp}_{target_w}x{target_h}.png"
-        try:
-            upscaled.save(file_path, format="PNG")
-        except Exception as exc:  # noqa: BLE001
-            print(f"Failed to save upscaled image: {exc}")
-            file_path = None
+        _save_png_async(upscaled, file_path)
 
         try:
             self._send_sse_event(
@@ -670,7 +673,7 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                         "width": target_w,
                         "height": target_h,
                         "applied_scale": scale,
-                        "saved_path": str(file_path) if file_path else None,
+                        "saved_path": str(file_path),
                     },
                 },
             )

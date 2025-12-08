@@ -426,6 +426,11 @@
         gap: 10px;
       }
 
+      .history-card-flex {
+        display: flex;
+        flex-direction: column;
+      }
+
       .history-header {
         display: flex;
         justify-content: space-between;
@@ -433,6 +438,13 @@
         gap: 10px;
         flex-wrap: wrap;
         margin-bottom: 12px;
+      }
+
+      .history-scroll-container {
+        flex-grow: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding-right: 10px;
       }
 
       .thumb-info {
@@ -1049,33 +1061,35 @@
         </div>
       </section>
 
-      <section class="card card-scroll" :style="syncedCardStyle">
+      <section class="card card-scroll history-card-flex" :style="syncedCardStyle">
         <div class="history-header">
           <h2>{{ t('history.title') }}</h2>
           <button class="secondary" :disabled="history.length === 0" @click="clearHistory">{{ t('history.clear') }}</button>
         </div>
-        <div v-if="history.length === 0" class="placeholder">{{ t('history.placeholder') }}</div>
-        <div v-else class="history-list">
-          <div
-            class="history-item"
-            v-for="(item, idx) in history"
-            :key="item.id"
-            @click="openPreview(idx, 'history')"
-            :title="t('history.title')"
-          >
-            <img class="history-thumb" :src="item.image" alt="历史缩略图" />
-            <div>
-              <div class="history-meta">
-                {{ item.prompt }}
-              <div>{{ t('history.steps') }}: {{ item.steps }} | {{ t('history.guidance') }}: {{ item.guidance }} | {{ t('history.seed') }}: {{ item.seed ?? t('seed.placeholder') }}</div>
-              <div>{{ t('history.size') }}: {{ item.width }}×{{ item.height }}</div>
-              <div v-if="item.negative">{{ t('history.negative') }}: {{ item.negative }}</div>
-              <div v-if="item.scale && item.scale !== 1">{{ t('meta.scale') }}: {{ item.scale }}×</div>
-            </div>
-            <div class="history-actions">
-              <button class="secondary" @click.stop="applyHistory(item)">{{ t('history.refill') }}</button>
-              <button class="secondary" @click.stop="regenerate(item)">{{ t('history.regenerate') }}</button>
-              <button class="secondary" @click.stop="deleteHistory(item.id)">{{ t('history.delete') }}</button>
+        <div class="history-scroll-container">
+          <div v-if="history.length === 0" class="placeholder">{{ t('history.placeholder') }}</div>
+          <div v-else class="history-list">
+            <div
+              class="history-item"
+              v-for="(item, idx) in history"
+              :key="item.id"
+              @click="openPreview(idx, 'history')"
+              :title="t('history.title')"
+            >
+              <img class="history-thumb" :src="item.image" alt="历史缩略图" />
+              <div>
+                <div class="history-meta">
+                  {{ item.prompt }}
+                <div>{{ t('history.steps') }}: {{ item.steps }} | {{ t('history.guidance') }}: {{ item.guidance }} | {{ t('history.seed') }}: {{ item.seed ?? t('seed.placeholder') }}</div>
+                <div>{{ t('history.size') }}: {{ item.width }}×{{ item.height }}</div>
+                <div v-if="item.negative">{{ t('history.negative') }}: {{ item.negative }}</div>
+                <div v-if="item.scale && item.scale !== 1">{{ t('meta.scale') }}: {{ item.scale }}×</div>
+              </div>
+              <div class="history-actions">
+                <button class="secondary" @click.stop="applyHistory(item)">{{ t('history.refill') }}</button>
+                <button class="secondary" @click.stop="regenerate(item)">{{ t('history.regenerate') }}</button>
+                <button class="secondary" @click.stop="deleteHistory(item.id)">{{ t('history.delete') }}</button>
+                </div>
               </div>
             </div>
           </div>

@@ -23,20 +23,20 @@
     />
     <style>
       :root {
-        --bg-base: #0f172a;
-        --bg-1: #1e293b;
-        --bg-2: #1d1b2f;
-        --panel: rgba(255, 255, 255, 0.06);
-        --panel-strong: rgba(255, 255, 255, 0.12);
-        --panel-soft: rgba(255, 255, 255, 0.04);
-        --input-bg: rgba(255, 255, 255, 0.06);
-        --accent: #7c3aed;
-        --accent-2: #22d3ee;
-        --text: #e2e8f0;
-        --muted: #94a3b8;
-        --success: #4ade80;
-        --danger: #f87171;
-        --shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+        --bg-base: #fff7ed;
+        --bg-1: #fef3c7;
+        --bg-2: #ffe4e6;
+        --panel: rgba(255, 255, 255, 0.92);
+        --panel-strong: rgba(15, 23, 42, 0.12);
+        --panel-soft: rgba(15, 23, 42, 0.04);
+        --input-bg: rgba(255, 255, 255, 0.92);
+        --accent: #f97316;
+        --accent-2: #fbbf24;
+        --text: #0f172a;
+        --muted: #475569;
+        --success: #16a34a;
+        --danger: #dc2626;
+        --shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
       }
 
       /* Prevent template flash before Vue mounts */
@@ -67,6 +67,44 @@
         grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
         gap: 20px;
         align-items: start;
+      }
+      .prompt-card {
+        grid-area: prompt;
+      }
+      .results-card {
+        grid-area: results;
+      }
+      .history-card {
+        grid-area: history;
+      }
+
+      /* Medium screens: keep prompt full height on the left, stack results/history on the right */
+      @media (min-width: 721px) and (max-width: 1200px) {
+        .layout {
+          grid-template-columns: 1fr 1fr;
+          grid-template-areas:
+            "prompt results"
+            "prompt history";
+        }
+      }
+
+      /* Large screens: keep three columns aligned */
+      @media (min-width: 1201px) {
+        .layout {
+          grid-template-columns: 1.1fr 0.95fr 0.95fr;
+          grid-template-areas: "prompt results history";
+        }
+      }
+
+      /* Small screens: single column stack in logical order */
+      @media (max-width: 720px) {
+        .layout {
+          grid-template-columns: 1fr;
+          grid-template-areas:
+            "prompt"
+            "results"
+            "history";
+        }
       }
 
       header {
@@ -892,7 +930,7 @@
       </header>
 
       <main class="layout">
-      <section class="card" ref="promptCardRef">
+      <section class="card prompt-card" ref="promptCardRef">
         <h2>{{ t('prompt.title') }}</h2>
         <label for="prompt">{{ t('prompt.title') }}</label>
         <textarea
@@ -910,7 +948,7 @@
 
         <div class="row">
           <div>
-            <label for="steps">{{ t('steps.label') }} {{ steps }}</label>
+            <label for="steps" title="控制推理步数，步数越多越精细但耗时更长">{{ t('steps.label') }} {{ steps }}</label>
             <input
               type="range"
               id="steps"
@@ -918,11 +956,10 @@
               min="4"
               max="30"
               step="1"
-              title="控制推理步数，步数越多越精细但耗时更长"
             />
           </div>
           <div>
-            <label for="guidance">{{ t('guidance.label') }} {{ guidance.toFixed(1) }}</label>
+            <label for="guidance" title="提示词引导强度，数值越高越贴合提示词，但过高可能产生伪影">{{ t('guidance.label') }} {{ guidance.toFixed(1) }}</label>
             <input
               type="range"
               id="guidance"
@@ -930,14 +967,13 @@
               min="0"
               max="10"
               step="0.5"
-              title="提示词引导强度，数值越高越贴合提示词，但过高可能产生伪影"
             />
           </div>
         </div>
 
           <div class="row">
           <div>
-            <label for="height">{{ t('height.label') }}</label>
+            <label for="height" title="输出图片高度，分辨率越大越耗时与显存">{{ t('height.label') }}</label>
             <input
               type="number"
               id="height"
@@ -945,12 +981,11 @@
               min="512"
               max="1024"
               step="64"
-              title="输出图片高度，分辨率越大越耗时与显存"
               @change="snapDimensions"
             />
           </div>
           <div>
-            <label for="width">{{ t('width.label') }}</label>
+            <label for="width" title="输出图片宽度，分辨率越大越耗时与显存">{{ t('width.label') }}</label>
             <input
               type="number"
               id="width"
@@ -958,22 +993,20 @@
               min="512"
               max="1024"
               step="64"
-              title="输出图片宽度，分辨率越大越耗时与显存"
               @change="snapDimensions"
             />
           </div>
           <div>
-            <label for="seed">{{ t('seed.label') }}</label>
+            <label for="seed" title="固定种子以复现同一结果；留空自动随机">{{ t('seed.label') }}</label>
             <input
               type="number"
               id="seed"
               v-model="seed"
               :placeholder="t('seed.placeholder')"
-              title="固定种子以复现同一结果；留空自动随机"
             />
           </div>
           <div>
-            <label for="batchCount">{{ t('batchCount.label') }}</label>
+            <label for="batchCount" title="一次点击连续生成多张图片，最多 10 张">{{ t('batchCount.label') }}</label>
             <input
               type="number"
               id="batchCount"
@@ -981,7 +1014,6 @@
               min="1"
               max="10"
               step="1"
-              title="一次点击连续生成多张图片，最多 10 张"
             />
           </div>
         </div>
@@ -1038,9 +1070,10 @@
       <!-- meta pills removed per request -->
       </section>
 
-      <section class="card card-scroll results-card-flex" :style="syncedCardStyle">
+      <section class="card card-scroll results-card-flex results-card" :style="syncedCardStyle">
         <div style="display:flex; align-items:center; gap:10px; justify-content: space-between; flex-wrap: wrap;">
           <h2 style="margin:0;">{{ t('results.title') }}</h2>
+          <button class="secondary" :disabled="!results.length" @click="downloadImage">{{ t('results.downloadAll') }}</button>
         </div>
         <div class="results-scroll-container">
           <div v-if="results.length" class="image-grid">
@@ -1070,7 +1103,7 @@
         </div>
       </section>
 
-      <section class="card card-scroll history-card-flex" :style="syncedCardStyle">
+      <section class="card card-scroll history-card-flex history-card" :style="syncedCardStyle">
         <div class="history-header">
           <h2>{{ t('history.title') }}</h2>
           <button class="secondary" :disabled="history.length === 0" @click="clearHistory">{{ t('history.clear') }}</button>
@@ -1217,6 +1250,7 @@
               'reset.button': '重置默认',
               'save.button': '保存图片',
               'results.title': '生成结果',
+              'results.downloadAll': '一键下载',
               'results.placeholder': '暂无图片，输入提示词后点击"生成图片"',
               'history.title': '历史记录',
               'history.clear': '清空',
@@ -1287,6 +1321,7 @@
               'reset.button': 'Reset to Default',
               'save.button': 'Save Image',
               'results.title': 'Generated Results',
+              'results.downloadAll': 'Download All',
               'results.placeholder': 'No images yet. Enter a prompt and click "Generate Image"',
               'history.title': 'History',
               'history.clear': 'Clear',
@@ -1330,11 +1365,11 @@
               'history.size': 'Size',
               'history.negative': 'Negative',
               'theme.label': 'Theme',
-              'theme.midnight': 'Midnight (Dark)',
-              'theme.dawn': 'Dawn (Light)',
-              'theme.sunset': 'Sunset Neon (Dark)',
-              'theme.glacier': 'Glacier (Light)',
-              'theme.forest': 'Forest (Dark)'
+              'theme.midnight': 'Midnight',
+              'theme.dawn': 'Dawn',
+              'theme.sunset': 'Sunset Neon',
+              'theme.glacier': 'Glacier',
+              'theme.forest': 'Forest'
             },
             ja: {
               'header.subtitle': '高品質な画像をオンライン生成',
@@ -1357,6 +1392,7 @@
               'reset.button': 'デフォルトにリセット',
               'save.button': '画像を保存',
               'results.title': '生成結果',
+              'results.downloadAll': '一括ダウンロード',
               'results.placeholder': 'まだ画像がありません。プロンプトを入力して「画像を生成」を押してください',
               'history.title': '履歴',
               'history.clear': 'クリア',
@@ -1400,11 +1436,11 @@
               'history.size': 'サイズ',
               'history.negative': 'ネガティブ',
               'theme.label': 'テーマ',
-              'theme.midnight': 'ミッドナイト (ダーク)',
-              'theme.dawn': '夜明け (ライト)',
-              'theme.sunset': 'サンセット (ダーク)',
-              'theme.glacier': 'グレイシャー (ライト)',
-              'theme.forest': 'フォレスト (ダーク)'
+              'theme.midnight': 'ミッドナイト',
+              'theme.dawn': '夜明け',
+              'theme.sunset': 'サンセット',
+              'theme.glacier': 'グレイシャー',
+              'theme.forest': 'フォレスト'
             }
           };
           const themes = {
@@ -1560,17 +1596,12 @@
           const viewportHeight = ref(
             typeof window !== "undefined" ? window.innerHeight || document.documentElement.clientHeight || 768 : 768
           );
-          const isTouchCoarse = ref(
-            typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(pointer: coarse)").matches : false
-          );
-          const isMobileLike = computed(() => viewportWidth.value <= 900 || isTouchCoarse.value);
+          // Keep desktop cards aligned to prompt card; treat only small/narrow viewports as mobile
+          const isMobileLike = computed(() => viewportWidth.value <= 720);
+          const stackedLayout = computed(() => !isMobileLike.value && viewportWidth.value <= 1200);
           const updateViewport = () => {
             viewportWidth.value = window.innerWidth || document.documentElement.clientWidth || viewportWidth.value;
             viewportHeight.value = window.innerHeight || document.documentElement.clientHeight || viewportHeight.value;
-          };
-          const pointerMedia = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(pointer: coarse)") : null;
-          const handlePointerChange = (evt) => {
-            isTouchCoarse.value = !!evt.matches;
           };
           let promptResizeObserver = null;
           const measurePromptHeight = () => {
@@ -1675,7 +1706,7 @@
             { key: "glacier", labelKey: "theme.glacier" },
             { key: "forest", labelKey: "theme.forest" },
           ];
-          const activeTheme = ref(localStorage.getItem('zimage-theme') || 'midnight');
+          const activeTheme = ref(localStorage.getItem('zimage-theme') || 'dawn');
           const themeMenuOpen = ref(false);
           const themeSwitchRef = ref(null);
           const themeControlWidth = ref('auto');
@@ -1743,10 +1774,6 @@
             window.addEventListener('resize', syncThemeWidth);
             window.addEventListener('resize', updateViewport);
             updateViewport();
-            if (pointerMedia && pointerMedia.addEventListener) {
-              pointerMedia.addEventListener("change", handlePointerChange);
-              isTouchCoarse.value = pointerMedia.matches;
-            }
             nextTick(syncCardHeightSoft);
             window.addEventListener('resize', syncCardHeightSoft);
             if (document.fonts && document.fonts.ready) {
@@ -1767,9 +1794,6 @@
             window.removeEventListener('resize', syncThemeWidth);
             window.removeEventListener('resize', updateViewport);
             window.removeEventListener('resize', syncCardHeightSoft);
-            if (pointerMedia && pointerMedia.removeEventListener) {
-              pointerMedia.removeEventListener("change", handlePointerChange);
-            }
             if (promptResizeObserver && promptResizeObserver.disconnect) {
               promptResizeObserver.disconnect();
             }
@@ -1785,7 +1809,7 @@
             { immediate: true }
           );
           const syncedCardStyle = computed(() => {
-            const maxHeightPx = Math.max(320, (viewportHeight.value || 700) * (isMobileLike.value ? 0.7 : 0.82));
+            const maxHeightPx = Math.max(320, (viewportHeight.value || 700) * 0.7);
             if (isMobileLike.value) {
               return {
                 maxHeight: `${Math.round(maxHeightPx)}px`,
@@ -1794,15 +1818,15 @@
                 overflow: "auto",
               };
             }
-            const targetHeight = promptCardHeight.value
-              ? Math.min(promptCardHeight.value, maxHeightPx)
-              : maxHeightPx;
-            return {
-              height: `${targetHeight}px`,
-              minHeight: `${targetHeight}px`,
-              maxHeight: `${Math.round(maxHeightPx)}px`,
-              overflow: "auto",
-            };
+            if (stackedLayout.value && promptCardHeight.value) {
+              const gapPx = 20;
+              const total = Math.max(promptCardHeight.value - gapPx, 320);
+              const half = Math.max(220, total / 2);
+              return { height: `${half}px`, minHeight: `${half}px`, maxHeight: `${half}px`, overflow: "auto" };
+            }
+            if (!promptCardHeight.value) return {};
+            const h = promptCardHeight.value;
+            return { height: `${h}px`, minHeight: `${h}px`, maxHeight: `${h}px`, overflow: "auto" };
           });
           watch(
             () => [

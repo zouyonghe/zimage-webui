@@ -1,5 +1,7 @@
 # Z-Image WebUI
 
+[中文](README.md) | [English](README_en.md) | [日本語](README_jp.md)
+
 Lightweight local Web UI for Z-Image with aspect presets, batch generation, auto-save, hi-res upscale, and magnifier.
 
 ## Feature Overview
@@ -33,6 +35,10 @@ cd scripts && bash download_models.sh && cd ..
 ```bash
 python webui_server.py
 # Default 0.0.0.0:9000, override with ZIMAGE_PORT
+
+# CLI quick run (local model)
+python zimage.py                       # use default prompt
+python zimage.py "a scenic mountain"   # custom prompt
 ```
 
 Open `http://localhost:9000` in your browser.

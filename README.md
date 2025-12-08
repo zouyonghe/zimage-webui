@@ -1,5 +1,7 @@
 # Z-Image WebUI
 
+[中文](README.md) | [English](README_en.md) | [日本語](README_jp.md)
+
 基于本地权重的轻量 Web UI，提供分辨率预设、连续批量生成和自动落盘保存等功能。
 
 ## 功能概览

@@ -1,5 +1,7 @@
 # Z-Image WebUI
 
+[中文](README.md) | [English](README_en.md) | [日本語](README_jp.md)
+
 アスペクト比プリセット、連続生成、自動保存、高解像度アップスケール、ルーペ機能を備えた Z-Image の軽量ローカル Web UI です。
 
 ## 機能概要
@@ -33,6 +35,10 @@ cd scripts && bash download_models.sh && cd ..
 ```bash
 python webui_server.py
 # デフォルト 0.0.0.0:9000、環境変数 ZIMAGE_PORT で変更可
+
+# コマンドラインで即生成（ローカルモデル使用）
+python zimage.py                     # デフォルトプロンプト
+python zimage.py "a scenic mountain" # 任意のプロンプト
 ```
 
 ブラウザで `http://localhost:9000` を開いてください。

@@ -28,3 +28,6 @@ vae/
 # Misc
 .idea/
 .vscode/
+scripts/concurrent_generate_test.py
+scripts/concurrent_upscale_test.py
+scripts/concurrent_upscale_stream_test.py

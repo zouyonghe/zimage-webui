@@ -1,3 +1,4 @@
+import argparse
 import os
 from pathlib import Path
 
@@ -12,6 +13,8 @@ torch.backends.cudnn.allow_tf32 = True
 
 # 如果显存碎片严重，开启可扩展显存模式
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
+DEFAULT_PROMPT = "a cat sitting on a chair, high quality, detailed"
 
 
 def load_pipeline(model_dir: Path) -> ZImagePipeline:
@@ -41,9 +44,20 @@ def load_pipeline(model_dir: Path) -> ZImagePipeline:
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Generate an image with Z-Image.")
+    parser.add_argument(
+        "prompt",
+        nargs="*",
+        help="Prompt to generate (optional; uses default prompt when omitted)",
+    )
+    args = parser.parse_args()
+
     model_dir = Path("./zimage-model")
     output_path = Path("zimage_test.png")
-    prompt = "a cat sitting on a chair, high quality, detailed"
+
+    prompt = " ".join(args.prompt).strip() if args.prompt else DEFAULT_PROMPT
+    if not prompt:
+        prompt = DEFAULT_PROMPT
 
     try:
         pipe = load_pipeline(model_dir)
@@ -51,7 +65,7 @@ def main():
         print(f"Failed to load pipeline: {exc}")
         return
 
-    print("Generating...")
+    print(f"Generating with prompt: {prompt!r}")
     image = pipe(
         prompt,
         num_inference_steps=9,

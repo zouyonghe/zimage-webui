@@ -31,3 +31,8 @@ vae/
 scripts/concurrent_generate_test.py
 scripts/concurrent_upscale_test.py
 scripts/concurrent_upscale_stream_test.py
+scripts/batch_stress_test.py
+scripts/batch_stress_test_no_stream.py
+scripts/test_cuda.py
+scripts/measure_cards.py
+scripts/zimage-webui.service

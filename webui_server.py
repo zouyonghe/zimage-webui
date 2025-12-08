@@ -10,7 +10,7 @@ import inspect
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from threading import Lock, Thread
+from threading import Lock, Thread, Semaphore
 from urllib.parse import urlparse
 from typing import Optional, Tuple
 
@@ -64,6 +64,8 @@ MAX_UPSCALE_EDGE = 4096
 UPSCALE_MODEL_PATH = Path(os.environ.get("ZIMAGE_UPSCALE_MODEL", ROOT / "weights" / "RealESRGAN_x4plus.pth"))
 UPSCALE_TILE = int(os.environ.get("ZIMAGE_UPSCALE_TILE", 256))
 UPSCALE_TILE_PAD = int(os.environ.get("ZIMAGE_UPSCALE_TILE_PAD", 10))
+UPSCALE_MAX_CONCURRENCY = int(os.environ.get("ZIMAGE_UPSCALE_CONCURRENCY", 1))
+UPSCALE_WAIT_TIMEOUT = int(os.environ.get("ZIMAGE_UPSCALE_WAIT_TIMEOUT", 60))  # seconds
 
 
 def clamp_resolution(height: int, width: int) -> Tuple[int, int]:
@@ -103,6 +105,7 @@ _PIPE_ERROR = None
 _UPSCALER = None
 _UPSCALER_LOCK = Lock()
 _UPSCALER_ERROR = None
+_UPSCALE_SEMAPHORE = Semaphore(max(1, UPSCALE_MAX_CONCURRENCY))
 
 
 def get_pipeline():
@@ -208,6 +211,32 @@ def get_upscaler():
         _UPSCALER_ERROR = None
         print(f"Upscaler ready on {device} using model {model_path}")
         return _UPSCALER
+
+
+def _acquire_upscale_slot() -> bool:
+    """Try to acquire an upscale concurrency slot."""
+    return _UPSCALE_SEMAPHORE.acquire(blocking=False)
+
+
+def _release_upscale_slot(acquired: bool):
+    if acquired:
+        _UPSCALE_SEMAPHORE.release()
+
+
+def _wait_for_upscale_slot(timeout: int, sse_emit=None) -> bool:
+    """Poll for an upscale slot with timeout; optionally emit SSE queue status."""
+    step = 0.5
+    waited = 0.0
+    while waited < timeout:
+        if _acquire_upscale_slot():
+            return True
+        waited += step
+        if sse_emit:
+            ok = sse_emit({"queued_for_seconds": round(waited, 1)})
+            if not ok:
+                return False
+        time.sleep(step)
+    return False
 
 
 class WebUIHandler(SimpleHTTPRequestHandler):
@@ -445,9 +474,15 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                 target_w = int(target_h * aspect)
             scale = round(target_w / src_w, 2)
 
+        slot_acquired = _wait_for_upscale_slot(UPSCALE_WAIT_TIMEOUT)
+        if not slot_acquired:
+            self._send_json(429, {"error": "Upscale busy, please retry in a moment", "timeout": UPSCALE_WAIT_TIMEOUT})
+            return
+
         try:
             upscaler, device = get_upscaler()
         except Exception as exc:  # noqa: BLE001
+            _release_upscale_slot(slot_acquired)
             self._send_json(500, {"error": f"Upscale unavailable: {exc}"})
             return
 
@@ -458,6 +493,7 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                 output, _ = upscaler.enhance(img_np, outscale=scale)
             upscaled = Image.fromarray(output[:, :, ::-1])
         except Exception as exc:  # noqa: BLE001
+            _release_upscale_slot(slot_acquired)
             self._send_json(500, {"error": f"Upscale failed: {exc}"})
             return
 
@@ -473,6 +509,8 @@ class WebUIHandler(SimpleHTTPRequestHandler):
         except Exception as exc:  # noqa: BLE001
             print(f"Failed to save upscaled image: {exc}")
             file_path = None
+
+        _release_upscale_slot(slot_acquired)
 
         self._send_json(
             200,
@@ -529,18 +567,26 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                 target_w = int(target_h * aspect)
             scale = round(target_w / src_w, 2)
 
-        try:
-            upscaler, device = get_upscaler()
-        except Exception as exc:  # noqa: BLE001
-            self._send_json(500, {"error": f"Upscale unavailable: {exc}"})
-            return
-
-        # Prepare streaming headers
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "keep-alive")
         self.end_headers()
+
+        def emit_queued(meta):
+            return self._send_sse_event("queued", {"waited": meta.get("queued_for_seconds", 0), "timeout": UPSCALE_WAIT_TIMEOUT})
+
+        slot_acquired = _wait_for_upscale_slot(UPSCALE_WAIT_TIMEOUT, emit_queued)
+        if not slot_acquired:
+            self._send_sse_event("error", {"message": "Upscale busy, please retry shortly", "timeout": UPSCALE_WAIT_TIMEOUT})
+            return
+
+        try:
+            upscaler, device = get_upscaler()
+        except Exception as exc:  # noqa: BLE001
+            _release_upscale_slot(slot_acquired)
+            self._send_sse_event("error", {"message": f"Upscale unavailable: {exc}"})
+            return
 
         def send_error(message: str):
             try:
@@ -596,8 +642,10 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             upscaled.save(buffer, format="PNG")
             encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
         except BrokenPipeError:
+            _release_upscale_slot(slot_acquired)
             return
         except Exception as exc:  # noqa: BLE001
+            _release_upscale_slot(slot_acquired)
             send_error(f"Upscale failed: {exc}")
             return
 
@@ -629,6 +677,8 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             self._send_sse_event("done", {"ok": True})
         except BrokenPipeError:
             return
+        finally:
+            _release_upscale_slot(slot_acquired)
     def log_message(self, fmt, *args):  # noqa: D401,N802
         """Silence noisy health polling logs."""
         if getattr(self, "path", "").startswith("/health"):

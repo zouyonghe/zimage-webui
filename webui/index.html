@@ -66,6 +66,7 @@
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
         gap: 20px;
+        align-items: start;
       }
 
       header {
@@ -423,6 +424,15 @@
       .history-list {
         display: grid;
         gap: 10px;
+      }
+
+      .history-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
       }
 
       .thumb-info {
@@ -1040,7 +1050,7 @@
       </section>
 
       <section class="card card-scroll" :style="syncedCardStyle">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="history-header">
           <h2>{{ t('history.title') }}</h2>
           <button class="secondary" :disabled="history.length === 0" @click="clearHistory">{{ t('history.clear') }}</button>
         </div>
@@ -1123,11 +1133,16 @@
               <button
                 class="secondary"
                 :class="{ 'auto-upscale-active': magnifierEnabled }"
+                :disabled="magnifierDisabled"
                 @click.stop="toggleMagnifier"
               >
                 {{ t('preview.magnifier') }}
               </button>
-              <button class="secondary" :disabled="!canUpscale || upscaleLoading" @click.stop="() => upscaleImage({ auto: true })">
+              <button
+                class="secondary"
+                :disabled="upscaleDisabled"
+                @click.stop="() => upscaleImage({ auto: true })"
+              >
                 {{ upscaleLoading ? t('upscale.running') : t('upscale.button') }}
               </button>
               <div class="status" style="margin:0;" :class="{'error': upscaleError}">
@@ -1150,28 +1165,6 @@
     <script type="module">
       import { createApp, ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
       import ElementPlus from "element-plus";
-      // Fallback DOM sync to hard-align card heights after Vue render
-      const syncCardsDom = () => {
-        const promptEl = document.querySelector("section.card");
-        if (!promptEl) return;
-        const rect = promptEl.getBoundingClientRect();
-        const height = rect.height || 0;
-        if (!height) return;
-        const targets = document.querySelectorAll("section.card-scroll");
-        targets.forEach((el) => {
-          el.style.height = `${height}px`;
-          el.style.minHeight = `${height}px`;
-          el.style.maxHeight = `${height}px`;
-          el.style.overflow = "auto";
-        });
-      };
-      window.addEventListener("load", () => {
-        syncCardsDom();
-        setTimeout(syncCardsDom, 400);
-        setTimeout(syncCardsDom, 800);
-      });
-      window.addEventListener("resize", () => requestAnimationFrame(syncCardsDom));
-
       const DEFAULT_PROMPT = "a cat sitting on a chair, high quality, detailed";
       const STREAM_TIMEOUT_MS = 30000; // 30 seconds per generate stream request
       const UPSCALE_TIMEOUT_MS = 30000; // 30 seconds per upscale stream request
@@ -1527,15 +1520,28 @@
           const magnifierImage = ref("");
           const magnifierData = ref({ bgX: 0, bgY: 0, naturalWidth: 0, naturalHeight: 0, clientX: 0, clientY: 0 });
           const magnifierEnabled = ref(false);
+          const magnifierDisabled = computed(() => loading.value || batchRunning.value || upscaleLoading.value);
           let magnifierRAF = null;
           let magnifierPending = null;
           const promptCardRef = ref(null);
-          const syncedCardHeight = ref(0);
+          const promptCardHeight = ref(0);
           let promptResizeObserver = null;
-          const computeAvailableHeight = () => {
-            const viewport = window.innerHeight || document.documentElement.clientHeight || 0;
-            // Leave room for header/padding; never let cards shrink too small
-            return Math.max(360, viewport - 180);
+          const measurePromptHeight = () => {
+            if (!promptCardRef.value) return;
+            const rect = promptCardRef.value.getBoundingClientRect();
+            const measured = Math.max(rect.height || 0, promptCardRef.value.scrollHeight || 0);
+            const fallback = Math.max(360, (window.innerHeight || 0) - 180);
+            const next = Math.max(measured, fallback);
+            if (Math.abs((promptCardHeight.value || 0) - next) > 1) {
+              promptCardHeight.value = next;
+            }
+          };
+          const syncCardHeightSoft = () => {
+            requestAnimationFrame(() => {
+              measurePromptHeight();
+              setTimeout(measurePromptHeight, 120);
+              setTimeout(measurePromptHeight, 320);
+            });
           };
           const totalWorkUnits = ref(0);
           const completedWorkUnits = ref(0);
@@ -1547,64 +1553,6 @@
             currentWorkPhase.value = "";
           };
           const showInfoOverlay = ref(false);
-          const syncCardHeight = () => {
-            const fallback = computeAvailableHeight();
-            if (!promptCardRef.value) {
-              syncedCardHeight.value = Math.max(syncedCardHeight.value || 0, fallback);
-              return;
-            }
-            const rect = promptCardRef.value.getBoundingClientRect();
-            const style = window.getComputedStyle(promptCardRef.value);
-            const margins =
-              parseFloat(style.marginTop || "0") + parseFloat(style.marginBottom || "0");
-            const contentHeight = Math.max(promptCardRef.value.scrollHeight || 0, rect.height || 0);
-            const h = contentHeight + margins;
-            const current = syncedCardHeight.value || 0;
-            const next = h || current || fallback;
-            syncedCardHeight.value = Math.max(next, current, fallback);
-            if (typeof window !== "undefined") {
-              window.__cardHeightDebug = { h, fallback, current, next, synced: syncedCardHeight.value };
-            }
-          };
-          const syncCardHeightSoft = () => {
-            syncCardHeight();
-            let last = syncedCardHeight.value;
-            let count = 0;
-            const maxTicks = 12;
-            const tick = () => {
-              syncCardHeight();
-              const next = syncedCardHeight.value;
-              const stable = Math.abs(next - last) < 1;
-              last = next;
-              count += 1;
-              if (stable || count >= maxTicks) return;
-              requestAnimationFrame(tick);
-            };
-            requestAnimationFrame(tick);
-          };
-          watch(
-            promptCardRef,
-            (el, prev) => {
-              if (promptResizeObserver && prev) {
-                promptResizeObserver.unobserve(prev);
-              }
-              if (promptResizeObserver && el) {
-                promptResizeObserver.observe(el);
-              }
-              nextTick(syncCardHeightSoft);
-            },
-            { immediate: true }
-          );
-          const syncedCardStyle = computed(() => {
-            const available = computeAvailableHeight();
-            const measured = syncedCardHeight.value;
-            const base = measured > 0 ? measured : available;
-            return {
-              minHeight: `${base}px`,
-              height: `${base}px`,
-              overflow: "auto"
-            };
-          });
           const upscaleScale = ref(2.0);
           const upscaleLoading = ref(false);
           const upscaleError = ref("");
@@ -1707,13 +1655,18 @@
             activeThemeLabel,
             () => nextTick(syncThemeWidth)
           );
+          watch(
+            () => [results.value.length, loading.value, batchRunning.value, upscaleLoading.value],
+            () => {
+              nextTick(syncCardHeightSoft);
+            }
+          );
           onMounted(() => {
             document.addEventListener('click', handleClickOutside);
             nextTick(syncThemeWidth);
             window.addEventListener('resize', syncThemeWidth);
             nextTick(syncCardHeightSoft);
             window.addEventListener('resize', syncCardHeightSoft);
-            window.addEventListener('load', syncCardHeightSoft);
             if (document.fonts && document.fonts.ready) {
               document.fonts.ready.then(() => syncCardHeightSoft());
             }
@@ -1723,7 +1676,6 @@
                 promptResizeObserver.observe(promptCardRef.value);
               }
             }
-            // Extra ticks to catch late font/layout changes
             setTimeout(syncCardHeightSoft, 80);
             setTimeout(syncCardHeightSoft, 200);
             setTimeout(syncCardHeightSoft, 400);
@@ -1732,7 +1684,6 @@
             document.removeEventListener('click', handleClickOutside);
             window.removeEventListener('resize', syncThemeWidth);
             window.removeEventListener('resize', syncCardHeightSoft);
-            window.removeEventListener('load', syncCardHeightSoft);
             if (promptResizeObserver && promptResizeObserver.disconnect) {
               promptResizeObserver.disconnect();
             }
@@ -1747,6 +1698,11 @@
             },
             { immediate: true }
           );
+          const syncedCardStyle = computed(() => {
+            if (!promptCardHeight.value) return {};
+            const h = promptCardHeight.value;
+            return { height: `${h}px`, minHeight: `${h}px`, overflow: "auto" };
+          });
           watch(
             () => [
               prompt.value,
@@ -2272,11 +2228,11 @@
                     buffer = parts.pop() || "";
                     for (const chunk of parts) {
                       const lines = chunk.split("\n");
-                      const eventLine = lines.find((line) => line.startsWith("event:"));
-                      const dataLine = lines.find((line) => line.startsWith("data:"));
-                      if (!eventLine || !dataLine) continue;
-                      const eventName = eventLine.replace("event:", "").trim();
-                      const dataRaw = dataLine.replace("data:", "").trim();
+                  const eventLine = lines.find((line) => line.startsWith("event:"));
+                  const dataLine = lines.find((line) => line.startsWith("data:"));
+                  if (!eventLine || !dataLine) continue;
+                  const eventName = eventLine.replace("event:", "").trim();
+                  const dataRaw = dataLine.replace("data:", "").trim();
                       let data;
                       try {
                         data = JSON.parse(dataRaw);
@@ -2297,14 +2253,11 @@
             return data;
             } catch (err) {
               const aborted = controller.signal.aborted || /abort|timeout/i.test(err?.message || "");
-              try {
-                return await fallbackUpscaleOnce(payload);
-              } catch (fallbackErr) {
-                if (aborted) {
-                  throw new Error(t('upscale.running') + " timeout");
-                }
-                throw fallbackErr;
+              if (aborted) {
+                throw new Error(t('upscale.running') + " timeout");
               }
+              // fallback to non-stream upscale on any other failure
+              return await fallbackUpscaleOnce(payload);
             } finally {
               cleanup();
             }
@@ -2391,6 +2344,16 @@
             { immediate: false }
           );
 
+          watch(
+            magnifierDisabled,
+            (disabled) => {
+              if (disabled && magnifierEnabled.value) {
+                toggleMagnifier();
+              }
+            },
+            { immediate: true }
+          );
+
           const toggleMagnifier = () => {
             magnifierEnabled.value = !magnifierEnabled.value;
             if (!magnifierEnabled.value) {
@@ -2435,6 +2398,8 @@
             }
           );
 
+          // Keep scroll-card heights aligned with the prompt card when content/state changes
+
           const previewItems = computed(() => (previewSource.value === "history" ? history.value : results.value));
 
           const currentPreviewItem = computed(() => {
@@ -2451,6 +2416,7 @@
               results.value.length > 0
             );
           });
+          const upscaleDisabled = computed(() => !canUpscale.value || upscaleLoading.value || loading.value || batchRunning.value);
 
           const magnifierStyle = computed(() => {
             if (!magnifierVisible.value || !magnifierEnabled.value) return {};
@@ -2761,11 +2727,14 @@
             previewSource,
             currentPreviewItem,
             canUpscale,
+            upscaleDisabled,
             magnifierVisible,
             magnifierStyle,
             onMagnifierMove,
             hideMagnifier,
             onPreviewWheel,
+            promptCardRef,
+            syncedCardStyle,
             upscaleScale,
             upscaleLoading,
             upscaleError,
@@ -2792,7 +2761,6 @@
             totalWorkUnits,
             completedWorkUnits,
             currentWorkPhase,
-            syncedCardStyle,
             upscaleProgressPercent,
             upscaleProgressLabel,
             applyHistory,
@@ -2817,6 +2785,7 @@
             autoUpscaleEnabled,
             toggleAutoUpscale,
             magnifierEnabled,
+            magnifierDisabled,
             toggleMagnifier,
             deleteResult,
             overallProgressActive,

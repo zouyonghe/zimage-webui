@@ -684,8 +684,8 @@
       .theme-trigger {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        padding: 9px 10px;
+        gap: 10px;
+        padding: 10px 12px;
         background: var(--bg-base);
         border: 1px solid var(--panel-strong);
         border-radius: 14px;
@@ -701,14 +701,6 @@
         transform: translateY(-1px);
         border-color: var(--accent);
         box-shadow: 0 14px 32px rgba(0, 0, 0, 0.25);
-      }
-
-      .theme-trigger .theme-dot {
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        border: 1px solid var(--panel-strong);
-        box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
       }
 
       .theme-trigger .theme-text {
@@ -758,33 +750,23 @@
       .theme-option {
         display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 8px 10px;
-        border-radius: 10px;
-        border: 1px solid var(--panel-strong);
+        justify-content: center;
+        padding: 12px;
+        border-radius: 12px;
+        border: none;
         cursor: pointer;
-        transition: transform 0.1s ease, border-color 0.2s ease, background 0.2s ease;
+        transition: transform 0.1s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
         width: 100%;
+        background-size: 100% 100%;
+        background-clip: padding-box;
       }
 
       .theme-option:hover {
         transform: translateY(-1px);
-        border-color: var(--accent);
-        background: var(--panel-soft);
       }
 
       .theme-option.active {
-        border-color: var(--accent);
         box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
-      }
-
-      .theme-swatch {
-        width: 38px;
-        height: 26px;
-        border-radius: 8px;
-        border: 1px solid var(--panel-strong);
-        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
-        margin-left: auto;
       }
 
       .theme-name {
@@ -883,7 +865,6 @@
         <div style="display: flex; align-items: center; gap: 12px">
           <div class="theme-switch" ref="themeSwitchRef" :class="{ open: themeMenuOpen }">
             <button class="theme-trigger" type="button" @click.stop="toggleThemeMenu">
-              <span class="theme-dot" :style="activeThemeSwatch"></span>
               <div class="theme-text">
                 <small>{{ t('theme.label') }}</small>
                 <strong>{{ activeThemeLabel }}</strong>
@@ -897,8 +878,8 @@
                 :key="theme.key"
                 :class="{ active: activeTheme === theme.key }"
                 @click.stop="selectTheme(theme.key)"
+                :style="getThemeButtonStyle(theme.key)"
               >
-                <div class="theme-swatch" :style="getThemeSwatch(theme.key)"></div>
                 <div class="theme-name">{{ t(theme.labelKey) }}</div>
               </div>
             </div>
@@ -1293,10 +1274,10 @@
               'history.seed': '种子',
               'history.size': '尺寸',
               'history.negative': '负面',
-            'theme.label': '主题',
+              'theme.label': '主题',
               'theme.midnight': '深蓝',
               'theme.dawn': '晨光',
-              'theme.sunset': '落日',
+              'theme.sunset': '紫韵',
               'theme.glacier': '冰蓝',
               'theme.forest': '森野'
             },
@@ -1367,7 +1348,7 @@
               'theme.label': 'Theme',
               'theme.midnight': 'Midnight',
               'theme.dawn': 'Dawn',
-              'theme.sunset': 'Sunset Neon',
+              'theme.sunset': 'Violet',
               'theme.glacier': 'Glacier',
               'theme.forest': 'Forest'
             },
@@ -1436,11 +1417,11 @@
               'history.size': 'サイズ',
               'history.negative': 'ネガティブ',
               'theme.label': 'テーマ',
-              'theme.midnight': 'ミッドナイト',
+              'theme.midnight': '深夜',
               'theme.dawn': '夜明け',
-              'theme.sunset': 'サンセット',
-              'theme.glacier': 'グレイシャー',
-              'theme.forest': 'フォレスト'
+              'theme.sunset': '紫苑',
+              'theme.glacier': '氷河',
+              'theme.forest': '森林'
             }
           };
           const themes = {
@@ -1485,20 +1466,20 @@
             sunset: {
               mode: "dark",
               vars: {
-                "bg-base": "#1a1325",
-                "bg-1": "#2b1538",
-                "bg-2": "#3b1225",
-                panel: "rgba(255, 255, 255, 0.05)",
-                "panel-strong": "rgba(255, 255, 255, 0.12)",
-                "panel-soft": "rgba(255, 255, 255, 0.04)",
-                "input-bg": "rgba(255, 255, 255, 0.06)",
-                accent: "#fb7185",
-                "accent-2": "#f97316",
-                text: "#f8fafc",
-                muted: "#e2e8f0",
+                "bg-base": "#0f0a1a",
+                "bg-1": "#1a1030",
+                "bg-2": "#241443",
+                panel: "rgba(255, 255, 255, 0.06)",
+                "panel-strong": "rgba(255, 255, 255, 0.14)",
+                "panel-soft": "rgba(255, 255, 255, 0.05)",
+                "input-bg": "rgba(255, 255, 255, 0.08)",
+                accent: "#a855f7",
+                "accent-2": "#8b5cf6",
+                text: "#f5f3ff",
+                muted: "#c4b5fd",
                 success: "#34d399",
                 danger: "#f87171",
-                shadow: "0 20px 50px rgba(0, 0, 0, 0.35)",
+                shadow: "0 20px 50px rgba(0, 0, 0, 0.4)",
               },
             },
             glacier: {
@@ -1719,14 +1700,18 @@
               themeControlWidth.value = `${width}px`;
             }
           };
-          const getThemeSwatch = (key) => {
+          const getThemeButtonStyle = (key) => {
             const theme = themes[key];
             if (!theme) return {};
             const accent = theme.vars.accent;
             const accent2 = theme.vars["accent-2"] || accent;
-            return { background: `linear-gradient(135deg, ${accent}, ${accent2})` };
+            const textColor = theme.mode === "light" ? "#0c1024" : "#f8fafc";
+            return {
+              background: `linear-gradient(135deg, ${accent}, ${accent2})`,
+              color: textColor,
+              border: "none",
+            };
           };
-          const activeThemeSwatch = computed(() => getThemeSwatch(activeTheme.value));
           const activeThemeLabel = computed(() => {
             const match = themeOptions.find((item) => item.key === activeTheme.value);
             return match ? t(match.labelKey) : t('theme.label');
@@ -2905,12 +2890,11 @@
             themeOptions,
             activeTheme,
             activeThemeLabel,
-            activeThemeSwatch,
             themeMenuOpen,
             themeSwitchRef,
             themeControlWidth,
             syncThemeWidth,
-            getThemeSwatch,
+            getThemeButtonStyle,
             toggleThemeMenu,
             selectTheme,
             requestStop,

@@ -1181,8 +1181,7 @@
       import ElementPlus from "element-plus";
       const DEFAULT_PROMPT = "a cat sitting on a chair, high quality, detailed";
       const STREAM_TIMEOUT_MS = 30000; // 30 seconds per generate stream request
-      // Upscaling large (e.g., 1024px) inputs can take longer; allow more headroom.
-      const UPSCALE_TIMEOUT_MS = 180000; // 3 minutes per upscale stream request
+      const UPSCALE_TIMEOUT_MS = 60000; // 60 seconds per upscale stream request
 
       createApp({
         setup() {
@@ -1571,6 +1570,21 @@
           const upscaleScale = ref(2.0);
           const upscaleLoading = ref(false);
           const upscaleError = ref("");
+          let upscaleErrorTimer = null;
+          const setUpscaleError = (msg = "") => {
+            upscaleError.value = msg;
+            if (upscaleErrorTimer) {
+              clearTimeout(upscaleErrorTimer);
+              upscaleErrorTimer = null;
+            }
+            if (msg) {
+              upscaleErrorTimer = setTimeout(() => {
+                if (!upscaleLoading.value && upscaleError.value === msg) {
+                  upscaleError.value = "";
+                }
+              }, 5000);
+            }
+          };
           const upscaleStepProgress = ref({ current: 0, total: 0 });
           const autoUpscaleEnabled = ref(false);
           const lastAutoBaseId = ref("");
@@ -2265,14 +2279,16 @@
               };
               read();
             });
-            return data;
+              return data;
             } catch (err) {
               const aborted = controller.signal.aborted || /abort|timeout/i.test(err?.message || "");
-              if (aborted) {
-                throw new Error(t('upscale.running') + " timeout");
+              // fallback to non-stream upscale on any failure (including timeout)
+              try {
+                return await fallbackUpscaleOnce(payload);
+              } catch (fallbackErr) {
+                const message = aborted ? `${t('upscale.running')} timeout` : (fallbackErr?.message || err?.message || "Upscale failed");
+                throw new Error(message);
               }
-              // fallback to non-stream upscale on any other failure
-              return await fallbackUpscaleOnce(payload);
             } finally {
               cleanup();
             }
@@ -2281,11 +2297,11 @@
           const upscaleImage = async ({ auto = false, sourceOverride = null } = {}) => {
             const sourcePayload = sourceOverride || pickUpscaleSource();
             if (!sourcePayload.image) {
-              upscaleError.value = t('upscale.noImage');
+              setUpscaleError(t('upscale.noImage'));
               return;
             }
             upscaleLoading.value = true;
-            upscaleError.value = "";
+            setUpscaleError("");
             upscaleStepProgress.value = { current: 0, total: 0 };
             if (auto) {
               currentWorkPhase.value = "upscale";
@@ -2320,7 +2336,7 @@
               results.value = nextResults;
               addToHistory({ image: data.image, meta: { ...meta, scale: meta.applied_scale || meta.scale || upscaleScale.value } });
             } catch (err) {
-              upscaleError.value = err.message || "";
+              setUpscaleError(err.message || "");
             } finally {
               upscaleLoading.value = false;
               if (auto) {

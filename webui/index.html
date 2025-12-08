@@ -823,6 +823,15 @@
         .image-frame {
           aspect-ratio: 1 / 1;
         }
+        .results-card-flex,
+        .history-card-flex {
+          max-height: 70vh;
+        }
+        .results-scroll-container,
+        .history-scroll-container {
+          max-height: 55vh;
+          padding-right: 6px;
+        }
       }
     </style>
   </head>
@@ -1545,6 +1554,24 @@
           let magnifierPending = null;
           const promptCardRef = ref(null);
           const promptCardHeight = ref(0);
+          const viewportWidth = ref(
+            typeof window !== "undefined" ? window.innerWidth || document.documentElement.clientWidth || 1024 : 1024
+          );
+          const viewportHeight = ref(
+            typeof window !== "undefined" ? window.innerHeight || document.documentElement.clientHeight || 768 : 768
+          );
+          const isTouchCoarse = ref(
+            typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(pointer: coarse)").matches : false
+          );
+          const isMobileLike = computed(() => viewportWidth.value <= 900 || isTouchCoarse.value);
+          const updateViewport = () => {
+            viewportWidth.value = window.innerWidth || document.documentElement.clientWidth || viewportWidth.value;
+            viewportHeight.value = window.innerHeight || document.documentElement.clientHeight || viewportHeight.value;
+          };
+          const pointerMedia = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(pointer: coarse)") : null;
+          const handlePointerChange = (evt) => {
+            isTouchCoarse.value = !!evt.matches;
+          };
           let promptResizeObserver = null;
           const measurePromptHeight = () => {
             if (!promptCardRef.value) return;
@@ -1714,6 +1741,12 @@
             document.addEventListener('click', handleClickOutside);
             nextTick(syncThemeWidth);
             window.addEventListener('resize', syncThemeWidth);
+            window.addEventListener('resize', updateViewport);
+            updateViewport();
+            if (pointerMedia && pointerMedia.addEventListener) {
+              pointerMedia.addEventListener("change", handlePointerChange);
+              isTouchCoarse.value = pointerMedia.matches;
+            }
             nextTick(syncCardHeightSoft);
             window.addEventListener('resize', syncCardHeightSoft);
             if (document.fonts && document.fonts.ready) {
@@ -1732,7 +1765,11 @@
           onBeforeUnmount(() => {
             document.removeEventListener('click', handleClickOutside);
             window.removeEventListener('resize', syncThemeWidth);
+            window.removeEventListener('resize', updateViewport);
             window.removeEventListener('resize', syncCardHeightSoft);
+            if (pointerMedia && pointerMedia.removeEventListener) {
+              pointerMedia.removeEventListener("change", handlePointerChange);
+            }
             if (promptResizeObserver && promptResizeObserver.disconnect) {
               promptResizeObserver.disconnect();
             }
@@ -1748,9 +1785,24 @@
             { immediate: true }
           );
           const syncedCardStyle = computed(() => {
-            if (!promptCardHeight.value) return {};
-            const h = promptCardHeight.value;
-            return { height: `${h}px`, minHeight: `${h}px`, overflow: "auto" };
+            const maxHeightPx = Math.max(320, (viewportHeight.value || 700) * (isMobileLike.value ? 0.7 : 0.82));
+            if (isMobileLike.value) {
+              return {
+                maxHeight: `${Math.round(maxHeightPx)}px`,
+                height: "auto",
+                minHeight: "auto",
+                overflow: "auto",
+              };
+            }
+            const targetHeight = promptCardHeight.value
+              ? Math.min(promptCardHeight.value, maxHeightPx)
+              : maxHeightPx;
+            return {
+              height: `${targetHeight}px`,
+              minHeight: `${targetHeight}px`,
+              maxHeight: `${Math.round(maxHeightPx)}px`,
+              overflow: "auto",
+            };
           });
           watch(
             () => [

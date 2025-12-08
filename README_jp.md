@@ -60,3 +60,6 @@ python zimage.py "a scenic mountain" # 任意のプロンプト
 - Real-ESRGAN インストール時の `tb-nightly` 警告は無視可能。静かにしたい場合は `tensorboard` を入れてから `pip install realesrgan --no-deps` を実行。実行環境で `import realesrgan` できれば問題ありません。
 - 高解像度アップスケール結果は結果リストと履歴に追加され、倍率が表示されます。「自動アップスケール」はデフォルト無効。
 - ルーペのオン/オフはプレビュー操作バーにあります。オフのままなら描画されず、パフォーマンスに影響しません。
+
+## ライセンス
+本プロジェクトは MIT ライセンスで配布しています。詳細は `LICENSE` を参照してください。

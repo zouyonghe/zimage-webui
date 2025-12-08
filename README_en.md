@@ -60,3 +60,6 @@ Outputs save to `outputs/`, e.g. `20240614_153045_768x768_rand.png`.
 - Real-ESRGAN install warning about `tb-nightly` can be ignored; to silence, `pip install tensorboard` then `pip install realesrgan --no-deps`. Just ensure runtime can `import realesrgan`.
 - Hi-res upscale results append to results/history with scale shown; “auto upscale” is off by default.
 - Magnifier toggle lives in the preview toolbar; when off, magnifier is not rendered to save performance.
+
+## License
+Released under the MIT License. See `LICENSE` for details.

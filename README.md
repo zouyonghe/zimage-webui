@@ -61,3 +61,6 @@ python zimage.py "a scenic mountain"  # 传入自定义提示词
 - Real-ESRGAN 安装提示 `tb-nightly` 缺失可忽略；如需消除，可先 `pip install tensorboard`，再执行 `pip install realesrgan --no-deps`。只要启动服务的 Python 环境能 `import realesrgan` 即可使用模型超分。
 - 高分放大结果会自动追加到结果列表与历史记录，历史中会显示放大倍数；默认“自动放大”关闭。
 - 放大镜开关位于预览操作栏，仅在预览大图时使用，关闭后不会渲染放大镜以节省性能。
+
+## 许可证
+本项目基于 MIT 许可证发布，详见 `LICENSE`。

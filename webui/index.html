@@ -1181,7 +1181,8 @@
       import ElementPlus from "element-plus";
       const DEFAULT_PROMPT = "a cat sitting on a chair, high quality, detailed";
       const STREAM_TIMEOUT_MS = 30000; // 30 seconds per generate stream request
-      const UPSCALE_TIMEOUT_MS = 30000; // 30 seconds per upscale stream request
+      // Upscaling large (e.g., 1024px) inputs can take longer; allow more headroom.
+      const UPSCALE_TIMEOUT_MS = 180000; // 3 minutes per upscale stream request
 
       createApp({
         setup() {

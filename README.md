@@ -1,66 +1,255 @@
 # Z-Image WebUI
 
+<div align="center">
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Platform](https://img.shields.io/badge/platform-CUDA%20GPU-green.svg)](https://developer.nvidia.com/cuda-zone)
+
 [中文](README.md) | [English](README_en.md) | [日本語](README_jp.md)
 
-基于本地权重的轻量 Web UI，提供分辨率预设、连续批量生成和自动落盘保存等功能。
+**基于本地权重的轻量级 AI 图像生成 Web 界面**
 
-## 功能概览
-- Vue 单页前端，支持提示词 / 负面词、步数、引导强度、种子。
-- 内置中/英/日三语切换。
-- 画幅预设下拉（包含 512/768/1024 的 1:1 及常见比例），输入框自动对齐到 16 像素步长并限制在 512–1024。
-- 连续生成：一次点击可连续生成 1–10 张，默认每张使用独立随机种子；填入固定种子则按该值生成。
-- 自动保存：每次生成自动写入 `outputs/`，文件名包含时间戳、分辨率和种子（无种子时标记为 `rand`）。接口返回的 `meta.saved_path` 也可查看保存路径。
-- 初次加载随机填充一条提示词，便于直接试跑。
-- 高分放大：内置 Real-ESRGAN 超分，参数区可调倍率（1–4x），预览区有“高分放大”按钮触发；可选“自动放大”开启后，对后续生成的图片自动超分。
-- 放大镜与信息开关：预览大图时同一行的按钮可开启放大镜和信息叠层，信息仅在预览中显示且在右上角，不会遮挡操作按钮；默认关闭以节省性能。
+</div>
 
-## 环境要求
-- Python 3.10+
-- CUDA GPU（需要可用的 PyTorch CUDA 版本）
-- 本地 Z-Image 权重已放在 `zimage-model/`（默认使用本地权重，不走网络）
-- （可选）Real-ESRGAN 权重用于模型超分：`weights/RealESRGAN_x4plus.pth`，可设置 `ZIMAGE_UPSCALE_MODEL` 覆盖路径
+## 📖 项目简介
 
-## 安装
-```bash
-# 安装匹配 CUDA 的 torch/torchvision（示例为 CUDA 12.1）
-# pip install torch==2.5.1+cu121 torchvision==0.20.1 -f https://download.pytorch.org/whl/torch_stable.html
+Z-Image WebUI 是一个基于本地 AI 模型的轻量级图像生成界面，提供直观的 Web 操作体验。无需网络连接，完全在本地运行，保护您的创作隐私。
 
-pip install -r requirements.txt
+### ✨ 核心特性
 
-# 下载模型权重（需先安装 aria2c；脚本会下载主模型到 zimage-model/，并下载 RealESRGAN_x4plus 到 weights/）
-cd scripts && bash download_models.sh && cd ..
+- 🎨 **直观的 Web 界面** - 基于 Vue 3 的现代化单页应用
+- 🌍 **多语言支持** - 内置中文、英文、日文界面切换
+- 🖼️ **智能画幅预设** - 支持常见分辨率比例，自动对齐到 16 像素步长
+- ⚡ **批量生成** - 一次点击生成 1-10 张图片，支持随机或固定种子
+- 💾 **自动保存** - 生成结果自动保存到本地，包含完整元数据
+- 🔍 **高清放大** - 内置 Real-ESRGAN 超分辨率技术，支持 1-4 倍放大
+- 🔎 **放大镜功能** - 预览时提供细节查看，节省性能
+- 🎯 **即开即用** - 首次加载自动填充示例提示词
 
-```
+## 🚀 快速开始
 
-## 运行
+### 环境要求
+
+- **Python**: 3.10 或更高版本
+- **GPU**: 支持 CUDA 的 NVIDIA 显卡
+- **内存**: 建议 8GB 以上显存
+- **系统**: Linux / Windows / macOS
+
+### 安装步骤
+
+1. **克隆项目**
+   ```bash
+   git clone https://github.com/zouyonghe/zimage-webui.git
+   cd zimage-webui
+   ```
+
+2. **安装 PyTorch**（根据您的 CUDA 版本选择）
+   ```bash
+   # CUDA 12.1 示例
+   pip install torch==2.5.1+cu121 torchvision==0.20.1 -f https://download.pytorch.org/whl/torch_stable.html
+   ```
+
+3. **安装项目依赖**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **下载模型权重**
+   ```bash
+   cd scripts && bash download_models.sh && cd ..
+   ```
+
+### 启动服务
+
 ```bash
 python webui_server.py
-# 默认监听 0.0.0.0:9000，可通过环境变量 ZIMAGE_PORT 修改
-
-# 命令行快速生图（使用本地模型）
-python zimage.py                      # 使用默认提示词
-python zimage.py "a scenic mountain"  # 传入自定义提示词
 ```
 
-浏览器打开 `http://localhost:9000`。
+服务默认运行在 `http://localhost:9000`，您可以通过环境变量 `ZIMAGE_PORT` 修改端口。
 
-生成的图片会自动保存到 `outputs/`，文件名格式类似 `20240614_153045_768x768_rand.png`。
+### 命令行使用
 
-## 目录结构
-- `webui/`：前端页面（Vue 3 ESM）
-- `webui_server.py`：简易 HTTP 服务与生成接口
-- `zimage-model/`：模型权重（默认从本地加载）
-- `outputs/`：生成结果自动保存目录（运行后自动创建）
-- 其他：`requirements.txt`、测试脚本等
-- 模型下载脚本：`scripts/download_models.sh`（默认使用 hf-mirror 镜像）
-- CUDA 测试脚本：`scripts/test_cuda.py`
+```bash
+# 使用默认提示词
+python zimage.py
 
-## 其他
-- 如果需要调整分辨率范围，前后端都有最小 512 / 最大 1024、步长 16 的限制；同步修改 `webui/index.html` 与 `webui_server.py` 中的参数即可。
-- 服务器日志会打印生成请求参数与错误信息，便于排查。
-- Real-ESRGAN 安装提示 `tb-nightly` 缺失可忽略；如需消除，可先 `pip install tensorboard`，再执行 `pip install realesrgan --no-deps`。只要启动服务的 Python 环境能 `import realesrgan` 即可使用模型超分。
-- 高分放大结果会自动追加到结果列表与历史记录，历史中会显示放大倍数；默认“自动放大”关闭。
-- 放大镜开关位于预览操作栏，仅在预览大图时使用，关闭后不会渲染放大镜以节省性能。
+# 使用自定义提示词
+python zimage.py "a scenic mountain landscape"
+```
 
-## 许可证
-本项目基于 MIT 许可证发布，详见 `LICENSE`。
+## 📁 项目结构
+
+```
+zimage-webui/
+├── webui/                    # 前端资源
+│   ├── index.html           # 主页面（Vue 3 SPA）
+│   └── favicon-*.png        # 图标文件
+├── webui_server.py          # Web 服务器和 API
+├── zimage.py               # 命令行工具
+├── zimage-model/           # AI 模型权重目录
+├── weights/                # 超分模型权重
+├── outputs/                # 生成结果保存目录
+├── scripts/                # 辅助脚本
+│   └── download_models.sh  # 模型下载脚本
+└── requirements.txt        # Python 依赖包
+```
+
+## 🎯 功能详解
+
+### 图像生成参数
+
+| 参数 | 说明 | 范围 |
+|------|------|------|
+| 提示词 | 描述希望生成的内容 | 任意文本 |
+| 负面词 | 描述不希望出现的内容 | 任意文本 |
+| 生成步数 | 控制生成质量 | 1-50 |
+| 引导强度 | 控制对提示词的遵循程度 | 1.0-20.0 |
+| 随机种子 | 控制生成的随机性 | 任意整数或留空 |
+
+### 画幅预设
+
+- **方形**: 512×512, 768×768, 1024×1024
+- **横向**: 768×512, 1024×768, 1024×576
+- **纵向**: 512×768, 768×1024, 576×1024
+- **宽屏**: 1024×512, 1152×648
+- **竖屏**: 512×1024, 648×1152
+
+### 高清放大
+
+- **放大倍数**: 1x, 2x, 3x, 4x
+- **模型**: Real-ESRGAN_x4plus
+- **自动放大**: 可选择对新生成的图片自动应用超分
+- **质量优化**: 保持细节的同时提升分辨率
+
+## ⚙️ 配置说明
+
+### 环境变量
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `ZIMAGE_PORT` | 9000 | Web 服务端口 |
+| `ZIMAGE_UPSCALE_MODEL` | weights/RealESRGAN_x4plus.pth | 超分模型路径 |
+
+### 自定义配置
+
+修改分辨率限制（需同时修改前后端）：
+- 前端配置：`webui/index.html`
+- 后端配置：`webui_server.py`
+
+默认限制：
+- 最小分辨率：512×512
+- 最大分辨率：1024×1024
+- 步长：16 像素
+
+## 🔧 故障排除
+
+### 常见问题
+
+**Q: 提示 CUDA 不可用**
+```bash
+# 检查 CUDA 安装
+nvidia-smi
+python -c "import torch; print(torch.cuda.is_available())"
+```
+
+**Q: Real-ESRGAN 安装警告**
+```bash
+# 可忽略警告，或安装 tensorboard 消除警告
+pip install tensorboard
+pip install realesrgan --no-deps
+```
+
+**Q: 显存不足**
+- 减小生成分辨率
+- 降低批量生成数量
+- 关闭自动放大功能
+
+**Q: 模型下载失败**
+```bash
+# 检查 aria2c 是否安装
+aria2c --version
+
+# 手动下载模型到对应目录
+```
+
+### 性能优化
+
+1. **显存优化**
+   - 启用 xformers 内存高效注意力
+   - 使用可扩展显存模式
+   - 启用注意力切片
+
+2. **生成速度优化**
+   - 使用适当的精度（BF16/FP16）
+   - 调整生成步数
+   - 合理设置批量大小
+
+## 📊 生成结果
+
+### 文件命名格式
+
+生成的图片自动保存到 `outputs/` 目录，文件名格式：
+```
+{时间戳}_{宽度}x{高度}_{种子}.png
+```
+
+示例：`20240614_153045_768x768_rand.png`
+
+### 元数据信息
+
+每张图片包含完整的生成参数：
+- 提示词和负面词
+- 生成参数（步数、引导强度、种子）
+- 生成时间戳
+- 放大倍数（如适用）
+
+## 🤝 贡献指南
+
+欢迎提交 Issue 和 Pull Request！
+
+### 开发环境设置
+
+```bash
+# 克隆项目
+git clone https://github.com/zouyonghe/zimage-webui.git
+cd zimage-webui
+
+# 安装开发依赖
+pip install -r requirements.txt
+
+# 运行测试
+python scripts/test_cuda.py
+```
+
+### 代码规范
+
+- 遵循 PEP 8 Python 代码规范
+- 使用语义化的 Git 提交信息
+- 为新功能添加适当的文档
+
+## 📄 许可证
+
+本项目基于 [MIT 许可证](LICENSE) 发布。
+
+## 🙏 致谢
+
+- [Diffusers](https://github.com/huggingface/diffusers) - 强大的扩散模型库
+- [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) - 优秀的超分辨率模型
+- [Vue.js](https://vuejs.org/) - 现代化的前端框架
+- [Element Plus](https://element-plus.org/) - 优秀的 Vue 3 组件库
+
+## 📞 联系方式
+
+如有问题或建议，请通过以下方式联系：
+
+- 提交 [GitHub Issue](https://github.com/zouyonghe/zimage-webui/issues)
+- 项目主页：[https://github.com/zouyonghe/zimage-webui](https://github.com/zouyonghe/zimage-webui)
+
+---
+
+<div align="center">
+
+**⭐ 如果这个项目对您有帮助，请给我们一个 Star！**
+
+</div>

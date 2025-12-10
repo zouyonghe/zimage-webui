@@ -3,9 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Z-Image WebUI - 在线生成高质量图片" />
+    <meta name="keywords" content="AI图像生成,图像处理,机器学习" />
     <title>Z-Image WebUI</title>
     <link rel="icon" type="image/png" href="./favicon.png?v=3" sizes="256x256" id="app-favicon" />
     <link rel="icon" type="image/x-icon" href="./favicon.ico?v=1" />
+    <link rel="preconnect" href="https://unpkg.com" />
     <link rel="stylesheet" href="https://unpkg.com/element-plus@2.8.4/dist/index.css" />
     <script type="importmap">
       {
@@ -263,18 +266,7 @@
         padding: 0;
       }
 
-      input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, var(--accent), var(--accent-2));
-        border: 2px solid #0c1024;
-        box-shadow: 0 4px 10px rgba(124, 58, 237, 0.35);
-        cursor: pointer;
-      }
-
+      input[type="range"]::-webkit-slider-thumb,
       input[type="range"]::-moz-range-thumb {
         width: 16px;
         height: 16px;
@@ -283,6 +275,8 @@
         border: 2px solid #0c1024;
         box-shadow: 0 4px 10px rgba(124, 58, 237, 0.35);
         cursor: pointer;
+        -webkit-appearance: none;
+        appearance: none;
       }
 
       .row {
@@ -307,6 +301,37 @@
         cursor: pointer;
         transition: transform 0.1s ease, box-shadow 0.15s ease, opacity 0.15s ease;
         color: #0c1024;
+        position: relative;
+        overflow: hidden;
+      }
+      
+      button::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 5px;
+        height: 5px;
+        background: rgba(255, 255, 255, 0.5);
+        opacity: 0;
+        border-radius: 100%;
+        transform: scale(1, 1) translate(-50%);
+        transform-origin: 50% 50%;
+      }
+      
+      button:focus:not(:disabled)::after {
+        animation: ripple 1s ease-out;
+      }
+      
+      @keyframes ripple {
+        0% {
+          transform: scale(0, 0);
+          opacity: 0.5;
+        }
+        100% {
+          transform: scale(20, 20);
+          opacity: 0;
+        }
       }
 
       button.primary {
@@ -397,6 +422,22 @@
         cursor: zoom-in;
         transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
         aspect-ratio: 1 / 1;
+      }
+      
+      .thumb::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(45deg, transparent 48%, rgba(255, 255, 255, 0.1) 50%, transparent 52%);
+        transform: translateX(-100%);
+        transition: transform 0.6s ease;
+      }
+      
+      .thumb:hover::before {
+        transform: translateX(100%);
       }
 
       .thumb img {
@@ -621,6 +662,12 @@
         gap: 10px;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
         min-width: 220px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      
+      .corner-status--active {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 35px rgba(0, 0, 0, 0.3);
       }
 
       .dot {
@@ -655,6 +702,33 @@
         padding: 20px;
         z-index: 20;
         backdrop-filter: blur(4px);
+        opacity: 0;
+        animation: fadeIn 0.2s ease forwards;
+        overflow: hidden;
+      }
+      
+      @keyframes fadeIn {
+        to {
+          opacity: 1;
+        }
+      }
+      
+      .preview-body {
+        animation: slideUp 0.3s ease;
+        max-width: 95vw;
+        max-height: 95vh;
+        overflow: auto;
+      }
+      
+      @keyframes slideUp {
+        from {
+          transform: translateY(20px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
       }
 
       .preview-body {
@@ -671,8 +745,8 @@
       }
 
       .preview-body img {
-        max-width: 96vw;
-        max-height: 88vh;
+        max-width: 90vw;
+        max-height: 70vh;
         border-radius: 12px;
         object-fit: contain;
         justify-self: center;
@@ -842,39 +916,6 @@
         box-shadow: 0 10px 30px rgba(124, 58, 237, 0.35);
       }
 
-      input[type="range"] {
-        width: 100%;
-        -webkit-appearance: none;
-        appearance: none;
-        height: 6px;
-        border-radius: 999px;
-        background: var(--panel-strong);
-        margin: 0;
-        padding: 0;
-      }
-
-      input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, var(--accent), var(--accent-2));
-        border: 2px solid #0c1024;
-        box-shadow: 0 4px 10px rgba(124, 58, 237, 0.35);
-        cursor: pointer;
-      }
-
-      input[type="range"]::-moz-range-thumb {
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, var(--accent), var(--accent-2));
-        border: 2px solid #0c1024;
-        box-shadow: 0 4px 10px rgba(124, 58, 237, 0.35);
-        cursor: pointer;
-      }
-
       .magnifier-lens {
         position: fixed;
         pointer-events: none;
@@ -905,6 +946,64 @@
         .history-scroll-container {
           max-height: 55vh;
           padding-right: 6px;
+        }
+        
+        /* Mobile preview optimizations */
+        .preview-overlay {
+          padding: 10px;
+        }
+        
+        .preview-body {
+          max-width: 98vw;
+          max-height: 98vh;
+          padding: 15px;
+          gap: 10px;
+        }
+        
+        .preview-body img {
+          max-width: 85vw;
+          max-height: 60vh;
+        }
+        
+        .preview-actions {
+          flex-direction: column;
+          gap: 8px;
+        }
+        
+        .nav-buttons {
+          order: 2;
+          width: 100%;
+          justify-content: space-between;
+        }
+        
+        .nav-buttons button {
+          flex: 1;
+          min-width: 0;
+        }
+        
+        .preview-actions > div:last-child {
+          order: 1;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+        
+        .preview-actions button {
+          font-size: 13px;
+          padding: 10px 12px;
+          min-width: 80px;
+        }
+        
+        /* Optimize touch targets for mobile */
+        button {
+          min-height: 44px;
+          padding: 12px 16px;
+        }
+        
+        /* Improve scrolling performance */
+        .results-scroll-container,
+        .history-scroll-container {
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior: contain;
         }
       }
     </style>
@@ -1182,18 +1281,18 @@
           </div>
         </div>
       </section>
-        <div class="corner-status">
-          <div class="dot" :style="{ background: statusTone }"></div>
-          <div style="display:grid; gap:6px; min-width: 180px;">
-            <div>{{ statusLabel }}</div>
-            <div class="corner-progress" v-if="overallProgressActive">
-              <div class="progress-bar">
-                <div class="progress-fill" :style="{ width: overallProgressPercent + '%' }"></div>
-              </div>
-              <div style="font-size:12px; color: var(--muted); text-align:right;">{{ overallProgressLabel }}</div>
+        <div class="corner-status" :class="{ 'corner-status--active': loading || batchRunning || upscaleLoading }">
+        <div class="dot" :style="{ background: statusTone }"></div>
+        <div style="display:grid; gap:6px; min-width: 180px;">
+          <div>{{ statusLabel }}</div>
+          <div class="corner-progress" v-if="overallProgressActive">
+            <div class="progress-bar">
+              <div class="progress-fill" :style="{ width: overallProgressPercent + '%' }"></div>
             </div>
+            <div style="font-size:12px; color: var(--muted); text-align:right;">{{ overallProgressLabel }}</div>
           </div>
         </div>
+      </div>
 
       <div v-if="previewOpen" class="preview-overlay" @click.self="closePreview" @wheel.prevent="onPreviewWheel">
           <div class="preview-body" @wheel.prevent="onPreviewWheel">
@@ -1654,26 +1753,42 @@
           // Keep desktop cards aligned to prompt card; treat only small/narrow viewports as mobile
           const isMobileLike = computed(() => viewportWidth.value <= 720);
           const stackedLayout = computed(() => !isMobileLike.value && viewportWidth.value <= 1200);
+          let updateViewportThrottled = false;
           const updateViewport = () => {
-            viewportWidth.value = window.innerWidth || document.documentElement.clientWidth || viewportWidth.value;
-            viewportHeight.value = window.innerHeight || document.documentElement.clientHeight || viewportHeight.value;
+            if (updateViewportThrottled) return;
+            updateViewportThrottled = true;
+            
+            requestAnimationFrame(() => {
+              viewportWidth.value = window.innerWidth || document.documentElement.clientWidth || viewportWidth.value;
+              viewportHeight.value = window.innerHeight || document.documentElement.clientHeight || viewportHeight.value;
+              updateViewportThrottled = false;
+            });
           };
           let promptResizeObserver = null;
+          let measurePromptHeightThrottled = false;
           const measurePromptHeight = () => {
-            if (!promptCardRef.value) return;
-            const rect = promptCardRef.value.getBoundingClientRect();
-            const measured = Math.max(rect.height || 0, promptCardRef.value.scrollHeight || 0);
-            const next = Math.max(measured, 360);
-            if (Math.abs((promptCardHeight.value || 0) - next) > 1) {
-              promptCardHeight.value = next;
-            }
-          };
-          const syncCardHeightSoft = () => {
+            if (!promptCardRef.value || measurePromptHeightThrottled) return;
+            measurePromptHeightThrottled = true;
+            
             requestAnimationFrame(() => {
+              const rect = promptCardRef.value.getBoundingClientRect();
+              const measured = Math.max(rect.height || 0, promptCardRef.value.scrollHeight || 0);
+              const next = Math.max(measured, 360);
+              if (Math.abs((promptCardHeight.value || 0) - next) > 1) {
+                promptCardHeight.value = next;
+              }
+              measurePromptHeightThrottled = false;
+            });
+          };
+          
+          let syncTimeout = null;
+          const syncCardHeightSoft = () => {
+            if (syncTimeout) clearTimeout(syncTimeout);
+            syncTimeout = setTimeout(() => {
               measurePromptHeight();
               setTimeout(measurePromptHeight, 120);
               setTimeout(measurePromptHeight, 320);
-            });
+            }, 16); // ~60fps
           };
           const totalWorkUnits = ref(0);
           const completedWorkUnits = ref(0);
@@ -1827,33 +1942,58 @@
             }
           );
           onMounted(() => {
-            document.addEventListener('click', handleClickOutside);
+            document.addEventListener('click', handleClickOutside, { passive: true });
             nextTick(syncThemeWidth);
-            window.addEventListener('resize', syncThemeWidth);
-            window.addEventListener('resize', updateViewport);
+            
+            // Throttled resize handlers
+            const resizeHandler = () => {
+              syncThemeWidth();
+              updateViewport();
+              syncCardHeightSoft();
+            };
+            
+            let resizeTimeout;
+            const throttledResize = () => {
+              if (resizeTimeout) clearTimeout(resizeTimeout);
+              resizeTimeout = setTimeout(resizeHandler, 100);
+            };
+            
+            window.addEventListener('resize', throttledResize, { passive: true });
             updateViewport();
             nextTick(syncCardHeightSoft);
-            window.addEventListener('resize', syncCardHeightSoft);
+            
             if (document.fonts && document.fonts.ready) {
               document.fonts.ready.then(() => syncCardHeightSoft());
             }
+            
             if (window.ResizeObserver) {
               promptResizeObserver = new ResizeObserver(() => syncCardHeightSoft());
               if (promptCardRef.value) {
                 promptResizeObserver.observe(promptCardRef.value);
               }
             }
-            setTimeout(syncCardHeightSoft, 80);
-            setTimeout(syncCardHeightSoft, 200);
-            setTimeout(syncCardHeightSoft, 400);
+            
+            // Optimized initial sync
+            const syncSequence = () => {
+              syncCardHeightSoft();
+              if (resizeTimeout) clearTimeout(resizeTimeout);
+              resizeTimeout = setTimeout(syncCardHeightSoft, 100);
+            };
+            
+            syncSequence();
           });
           onBeforeUnmount(() => {
             document.removeEventListener('click', handleClickOutside);
-            window.removeEventListener('resize', syncThemeWidth);
-            window.removeEventListener('resize', updateViewport);
-            window.removeEventListener('resize', syncCardHeightSoft);
+            // Note: resize handlers are now throttled, but we still need to clean up
+            window.removeEventListener('resize', throttledResize);
             if (promptResizeObserver && promptResizeObserver.disconnect) {
               promptResizeObserver.disconnect();
+            }
+            if (syncTimeout) {
+              clearTimeout(syncTimeout);
+            }
+            if (resizeTimeout) {
+              clearTimeout(resizeTimeout);
             }
           });
           watch(
@@ -2092,7 +2232,11 @@
           const streamGenerateOnce = async (payload) => {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
-            const cleanup = () => clearTimeout(timeout);
+            const cleanup = () => {
+              clearTimeout(timeout);
+              clearFakeProgress();
+            };
+            
             try {
               const res = await fetch("/generate_stream", {
                 method: "POST",
@@ -2104,6 +2248,7 @@
                 const text = await res.text();
                 throw new Error(text || "Failed to start generation");
               }
+              
               const reader = res.body.getReader();
               const decoder = new TextDecoder();
               let buffer = "";
@@ -2129,27 +2274,32 @@
                     reader.cancel().catch(() => {});
                     resolve(data);
                   } else if (eventName === "error") {
-                    clearFakeProgress();
                     finished = true;
                     reader.cancel().catch(() => {});
                     reject(new Error(data?.error || "Generation failed"));
                   }
                 };
 
+                // Optimized buffer processing
                 const processBuffer = () => {
                   let idx;
                   while ((idx = buffer.indexOf("\n\n")) !== -1) {
                     const rawEvent = buffer.slice(0, idx).trim();
                     buffer = buffer.slice(idx + 2);
                     if (!rawEvent) continue;
+                    
                     const lines = rawEvent.split("\n");
                     let eventName = "message";
-                    let dataLines = [];
+                    let dataStr = "";
+                    
                     for (const line of lines) {
-                      if (line.startsWith("event:")) eventName = line.slice(6).trim();
-                      else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+                      if (line.startsWith("event:")) {
+                        eventName = line.slice(6).trim();
+                      } else if (line.startsWith("data:")) {
+                        dataStr = line.slice(5).trim();
+                      }
                     }
-                    const dataStr = dataLines.join("\n");
+                    
                     let parsed = {};
                     try {
                       parsed = dataStr ? JSON.parse(dataStr) : {};
@@ -2162,21 +2312,22 @@
 
                 const pump = async () => {
                   try {
-                    while (true) {
-                      if (finished) return;
+                    while (!finished) {
                       if (Date.now() - lastEventAt > STREAM_TIMEOUT_MS) {
                         throw new Error("stream timeout");
                       }
+                      
                       const { value, done } = await reader.read();
                       if (done) break;
+                      
                       buffer += decoder.decode(value, { stream: true });
                       processBuffer();
                     }
+                    
                     if (!finished) {
                       reject(new Error("Connection closed before completion"));
                     }
                   } catch (err) {
-                    clearFakeProgress();
                     reject(err);
                   }
                 };
@@ -2186,7 +2337,6 @@
 
               return await promise;
             } catch (err) {
-              clearFakeProgress();
               const aborted = controller.signal.aborted || /abort|timeout/i.test(err?.message || "");
               try {
                 const data = await fallbackGenerateOnce(payload);
@@ -2297,6 +2447,12 @@
             if (!magnifierEnabled.value) return;
             const img = event.currentTarget;
             if (!img) return;
+            
+            // Cancel previous frame if still pending
+            if (magnifierRAF) {
+              cancelAnimationFrame(magnifierRAF);
+            }
+            
             magnifierPending = {
               clientX: event.clientX,
               clientY: event.clientY,
@@ -2305,30 +2461,29 @@
               naturalHeight: img.naturalHeight || img.getBoundingClientRect().height,
               src: img.src,
             };
-            if (!magnifierRAF) {
-              magnifierRAF = requestAnimationFrame(() => {
-                if (!magnifierPending) {
-                  magnifierRAF = null;
-                  return;
-                }
-                const { clientX, clientY, rect, naturalWidth, naturalHeight, src } = magnifierPending;
-                magnifierPending = null;
+            
+            magnifierRAF = requestAnimationFrame(() => {
+              if (!magnifierPending) {
                 magnifierRAF = null;
-                if (!magnifierEnabled.value) return;
-                const x = clientX - rect.left;
-                const y = clientY - rect.top;
-                magnifierData.value = {
-                  bgX: (x / rect.width) * naturalWidth,
-                  bgY: (y / rect.height) * naturalHeight,
-                  naturalWidth,
-                  naturalHeight,
-                  clientX,
-                  clientY,
-                };
-                magnifierImage.value = src;
-                magnifierVisible.value = true;
-              });
-            }
+                return;
+              }
+              const { clientX, clientY, rect, naturalWidth, naturalHeight, src } = magnifierPending;
+              magnifierPending = null;
+              magnifierRAF = null;
+              if (!magnifierEnabled.value) return;
+              const x = clientX - rect.left;
+              const y = clientY - rect.top;
+              magnifierData.value = {
+                bgX: (x / rect.width) * naturalWidth,
+                bgY: (y / rect.height) * naturalHeight,
+                naturalWidth,
+                naturalHeight,
+                clientX,
+                clientY,
+              };
+              magnifierImage.value = src;
+              magnifierVisible.value = true;
+            });
           };
 
           const hideMagnifier = () => {

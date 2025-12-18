@@ -577,7 +577,8 @@ class WebUIHandler(SimpleHTTPRequestHandler):
 
         data_url, mime = _encode_image(upscaled, out_fmt)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    file_path = OUTPUT_DIR / f"{timestamp}_{target_w}x{target_h}.{out_fmt}"        _save_image_async(upscaled, file_path, fmt=out_fmt)
+        file_path = OUTPUT_DIR / f"{timestamp}_{target_w}x{target_h}.{out_fmt}"
+        _save_image_async(upscaled, file_path, fmt=out_fmt)
 
         _release_upscale_slot(slot_acquired)
 
@@ -733,7 +734,8 @@ class WebUIHandler(SimpleHTTPRequestHandler):
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         out_fmt = _validate_image_format(out_format)
-                    file_path = OUTPUT_DIR / f"{timestamp}_{target_w}x{target_h}.{out_fmt}"        _save_image_async(upscaled, file_path, fmt=out_fmt)
+        file_path = OUTPUT_DIR / f"{timestamp}_{target_w}x{target_h}.{out_fmt}"
+        _save_image_async(upscaled, file_path, fmt=out_fmt)
 
         try:
             self._send_sse_event(

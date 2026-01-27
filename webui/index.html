@@ -1904,16 +1904,6 @@
           const activeTheme = ref(localStorage.getItem('zimage-theme') || 'dawn');
           const themeMenuOpen = ref(false);
           const themeSwitchRef = ref(null);
-          const themeControlWidth = ref('auto');
-          const syncThemeWidth = () => {
-            const el = themeSwitchRef.value;
-            if (!el) return;
-            const btn = el.querySelector('.theme-trigger');
-            const width = (btn && btn.offsetWidth) || el.offsetWidth;
-            if (width) {
-              themeControlWidth.value = `${width}px`;
-            }
-          };
           const getThemeButtonStyle = (key) => {
             const theme = themes[key];
             if (!theme) return {};
@@ -1932,7 +1922,6 @@
           });
           const toggleThemeMenu = () => {
             themeMenuOpen.value = !themeMenuOpen.value;
-            nextTick(syncThemeWidth);
           };
           const closeThemeMenu = () => {
             themeMenuOpen.value = false;
@@ -1952,14 +1941,9 @@
             currentLang,
             (lang) => {
               document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
-              nextTick(syncThemeWidth);
               nextTick(syncCardHeightSoft);
             },
             { immediate: true }
-          );
-          watch(
-            activeThemeLabel,
-            () => nextTick(syncThemeWidth)
           );
           watch(
             () => [results.value.length, loading.value, batchRunning.value, upscaleLoading.value],
@@ -1981,11 +1965,9 @@
           );
           onMounted(() => {
             document.addEventListener('click', handleClickOutside, { passive: true });
-            nextTick(syncThemeWidth);
             
             // Throttled resize handlers
             const resizeHandler = () => {
-              syncThemeWidth();
               updateViewport();
               syncCardHeightSoft();
             };
@@ -2039,7 +2021,6 @@
             (key) => {
               applyTheme(key);
               localStorage.setItem('zimage-theme', key);
-              nextTick(syncThemeWidth);
               nextTick(syncCardHeightSoft);
             },
             { immediate: true }
@@ -3169,8 +3150,6 @@
             activeThemeLabel,
             themeMenuOpen,
             themeSwitchRef,
-            themeControlWidth,
-            syncThemeWidth,
             getThemeButtonStyle,
             toggleThemeMenu,
             selectTheme,

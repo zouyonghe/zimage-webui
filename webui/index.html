@@ -1034,201 +1034,1326 @@
         }
       }
     </style>
+    <style>
+      /* Workbench shell: theme variables remain source colors; these tokens unify structure. */
+      :root {
+        --bg-base: #0b0d12;
+        --bg-1: #0b0d12;
+        --bg-2: #12161f;
+        --panel: #12161f;
+        --panel-strong: rgba(148, 163, 184, 0.2);
+        --panel-soft: rgba(148, 163, 184, 0.08);
+        --input-bg: #0e1118;
+        --control-surface: #171b25;
+        --accent: #7c6cff;
+        --accent-2: #5b8cff;
+        --text: #edf0f7;
+        --muted: #929bad;
+        --success: #42c78a;
+        --danger: #f16f7a;
+        --shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+        --wb-canvas: color-mix(in srgb, var(--bg-base) 90%, #000 10%);
+        --wb-surface: color-mix(in srgb, var(--panel) 94%, var(--bg-base) 6%);
+        --wb-raised: color-mix(in srgb, var(--control-surface) 88%, var(--panel) 12%);
+        --wb-border: var(--panel-strong);
+        --wb-border-soft: color-mix(in srgb, var(--panel-strong) 68%, transparent);
+        --wb-accent-soft: color-mix(in srgb, var(--accent) 15%, transparent);
+        --wb-focus: color-mix(in srgb, var(--accent) 74%, white 26%);
+        --wb-header-height: 64px;
+        --wb-radius: 6px;
+      }
+
+      [v-cloak] {
+        display: none;
+      }
+
+      html {
+        min-width: 0;
+        background: var(--bg-base);
+      }
+
+      body {
+        min-width: 0;
+        min-height: 100vh;
+        padding: 0;
+        overflow-x: hidden;
+        color: var(--text);
+        background: var(--bg-base);
+        font-family: "Public Sans", "Inter", system-ui, -apple-system, sans-serif;
+        letter-spacing: 0;
+      }
+
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+        letter-spacing: 0;
+      }
+
+      button,
+      .theme-option {
+        border-radius: var(--wb-radius);
+      }
+
+      button::after,
+      .thumb::before {
+        display: none;
+      }
+
+      button:focus,
+      input:focus,
+      textarea:focus,
+      select:focus {
+        transform: none;
+      }
+
+      button:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible,
+      select:focus-visible,
+      a:focus-visible,
+      .theme-option:focus-visible,
+      .thumb:focus-visible,
+      .history-item:focus-visible {
+        outline: 2px solid var(--wb-focus);
+        outline-offset: 2px;
+      }
+
+      input,
+      textarea,
+      select {
+        min-height: 40px;
+        padding: 9px 11px;
+        border: 1px solid var(--wb-border);
+        border-radius: var(--wb-radius);
+        background: var(--input-bg);
+        color: var(--text);
+        box-shadow: none;
+      }
+
+      input:hover,
+      textarea:hover,
+      select:hover {
+        border-color: color-mix(in srgb, var(--accent) 48%, var(--wb-border));
+      }
+
+      textarea {
+        min-height: 116px;
+        line-height: 1.55;
+      }
+
+      select,
+      .theme-switch select,
+      select option {
+        background: var(--input-bg);
+        color: var(--text);
+      }
+
+      label {
+        margin: 0 0 6px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.3;
+      }
+
+      input[type="range"] {
+        min-height: 24px;
+        background: transparent;
+      }
+
+      input[type="range"]::-webkit-slider-runnable-track {
+        height: 4px;
+        border-radius: 2px;
+        background: var(--panel-strong);
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        width: 16px;
+        height: 16px;
+        margin-top: -6px;
+        border: 2px solid var(--wb-surface);
+        background: var(--accent);
+        box-shadow: none;
+      }
+
+      input[type="range"]::-moz-range-track {
+        height: 4px;
+        border-radius: 2px;
+        background: var(--panel-strong);
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border: 2px solid var(--wb-surface);
+        background: var(--accent);
+        box-shadow: none;
+      }
+
+      #app {
+        min-width: 0;
+        min-height: 100vh;
+      }
+
+      .app-header {
+        position: sticky;
+        top: 0;
+        z-index: 15;
+        width: 100%;
+        max-width: none;
+        min-height: var(--wb-header-height);
+        margin: 0;
+        padding: 10px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--wb-border-soft);
+        background: color-mix(in srgb, var(--bg-base) 91%, transparent);
+        backdrop-filter: blur(16px);
+      }
+
+      .brand-block,
+      .header-tools,
+      .header-settings,
+      .model-indicator {
+        display: flex;
+        align-items: center;
+      }
+
+      .brand-block {
+        min-width: 0;
+        gap: 10px;
+      }
+
+      .logo {
+        width: 34px;
+        height: 34px;
+        flex: 0 0 auto;
+        border-radius: 6px;
+      }
+
+      .brand-copy {
+        min-width: 0;
+      }
+
+      .brand-copy h1 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      .brand-subtitle {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.2;
+      }
+
+      .header-tools {
+        min-width: 0;
+        justify-content: flex-end;
+        gap: 12px;
+      }
+
+      .header-settings {
+        gap: 8px;
+      }
+
+      .model-indicator {
+        min-width: 0;
+        max-width: 340px;
+        gap: 8px;
+        padding: 7px 10px;
+        border: 1px solid var(--wb-border-soft);
+        border-radius: var(--wb-radius);
+        background: var(--panel-soft);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .model-indicator .status-dot {
+        width: 7px;
+        height: 7px;
+        flex: 0 0 auto;
+        border-radius: 50%;
+        background: var(--success);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 14%, transparent);
+      }
+
+      .model-indicator.error .status-dot {
+        background: var(--danger);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 14%, transparent);
+      }
+
+      .model-indicator-text {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .github-link {
+        width: 36px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+        border: 1px solid var(--wb-border-soft);
+        border-radius: var(--wb-radius);
+        color: var(--muted);
+        background: var(--panel-soft);
+      }
+
+      .github-link:hover {
+        color: var(--text);
+        border-color: var(--accent);
+        transform: none;
+      }
+
+      .theme-switch,
+      .language-switch {
+        padding: 3px;
+        border: 1px solid var(--wb-border-soft);
+        border-radius: var(--wb-radius);
+        background: var(--panel-soft);
+      }
+
+      .theme-trigger,
+      .lang-btn {
+        min-height: 30px;
+        padding: 6px 9px;
+        border-radius: 4px;
+        color: var(--muted);
+        background: transparent;
+        font-size: 12px;
+      }
+
+      .theme-trigger,
+      .lang-btn.active {
+        color: var(--text);
+        background: var(--wb-raised);
+      }
+
+      .theme-dropdown {
+        top: calc(100% + 7px);
+        right: 0;
+        min-width: 150px;
+        padding: 5px;
+        border: 1px solid var(--wb-border);
+        border-radius: var(--wb-radius);
+        background: var(--wb-raised);
+        box-shadow: var(--shadow);
+      }
+
+      .theme-option {
+        min-height: 38px;
+        padding: 8px 10px;
+      }
+
+      .theme-name {
+        font-size: 12px;
+      }
+
+      .layout {
+        width: 100%;
+        max-width: 1800px;
+        min-width: 0;
+        height: calc(100vh - var(--wb-header-height));
+        min-height: 0;
+        margin: 0 auto;
+        padding: 16px 20px 20px;
+        display: grid;
+        grid-template-columns: minmax(340px, 430px) minmax(0, 1fr);
+        grid-template-areas:
+          "prompt results"
+          "history history";
+        grid-template-rows: minmax(0, 1fr) auto;
+        gap: 16px;
+        align-items: stretch;
+      }
+
+      .card {
+        min-width: 0;
+        padding: 0;
+        border: 1px solid var(--wb-border-soft);
+        border-radius: var(--wb-radius);
+        background: var(--wb-surface);
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.12);
+        backdrop-filter: none;
+      }
+
+      .prompt-card {
+        grid-area: prompt;
+        height: auto !important;
+        max-height: none !important;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: clip;
+      }
+
+      .console-header,
+      .panel-header,
+      .history-header {
+        min-height: 48px;
+        margin: 0;
+        padding: 11px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border-bottom: 1px solid var(--wb-border-soft);
+      }
+
+      .console-header h2,
+      .panel-header h2,
+      .history-header h2 {
+        margin: 0;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0;
+      }
+
+      .panel-kicker {
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      .console-body {
+        min-width: 0;
+        min-height: 0;
+        padding: 14px;
+        display: grid;
+        flex: 1;
+        gap: 16px;
+        overflow-y: auto;
+      }
+
+      .control-section {
+        min-width: 0;
+        display: grid;
+        gap: 10px;
+      }
+
+      .control-section + .control-section {
+        padding-top: 15px;
+        border-top: 1px solid var(--wb-border-soft);
+      }
+
+      .control-section-title {
+        margin: 0;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .label-row {
+        min-width: 0;
+      }
+
+      .label-row label {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .inline-action {
+        min-height: 28px;
+        padding: 4px 8px;
+        flex: 0 0 auto;
+        border: 0;
+        color: var(--muted);
+        background: transparent;
+        font-size: 11px;
+      }
+
+      .inline-action:hover:not(:disabled) {
+        color: var(--text);
+        background: var(--panel-soft);
+      }
+
+      .negative-field textarea {
+        min-height: 78px;
+      }
+
+      .model-row {
+        margin: 0;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: end;
+      }
+
+      .model-row button {
+        min-height: 40px;
+        white-space: nowrap;
+      }
+
+      .model-status {
+        min-width: 0;
+        margin: 0;
+        padding: 7px 9px;
+        border-left: 2px solid var(--accent);
+        background: var(--panel-soft);
+        overflow-wrap: anywhere;
+      }
+
+      .row,
+      .parameter-grid {
+        min-width: 0;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .parameter-grid--four {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .field-value-label {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .field-value-label strong {
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      .upscale-control {
+        min-width: 0;
+      }
+
+      .action-dock {
+        position: sticky;
+        bottom: 0;
+        z-index: 5;
+        margin-top: auto;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        border-top: 1px solid var(--wb-border);
+        background: color-mix(in srgb, var(--wb-surface) 95%, transparent);
+        backdrop-filter: blur(14px);
+      }
+
+      .action-dock .primary {
+        min-height: 46px;
+      }
+
+      .secondary-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .secondary-actions button {
+        width: 100%;
+        min-width: 0;
+      }
+
+      button {
+        min-height: 36px;
+        padding: 8px 11px;
+        border: 1px solid transparent;
+        color: var(--text);
+        background: var(--wb-raised);
+        box-shadow: none;
+        font-size: 12px;
+      }
+
+      button.primary {
+        border-color: color-mix(in srgb, var(--accent) 75%, white 25%);
+        color: #fff;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 24%, transparent);
+      }
+
+      button.secondary {
+        border-color: var(--wb-border-soft);
+        color: var(--text);
+        background: var(--panel-soft);
+      }
+
+      button:not(:disabled):hover {
+        border-color: color-mix(in srgb, var(--accent) 62%, var(--wb-border));
+        transform: none;
+      }
+
+      button:disabled {
+        opacity: 0.42;
+      }
+
+      .auto-upscale-active {
+        border-color: var(--accent) !important;
+        color: var(--text) !important;
+        background: var(--wb-accent-soft) !important;
+        box-shadow: none;
+      }
+
+      .results-card {
+        grid-area: results;
+        height: auto !important;
+        max-height: none !important;
+        min-height: 620px;
+        display: flex;
+        flex-direction: column;
+        overflow: visible !important;
+      }
+
+      .results-card-flex,
+      .history-card-flex {
+        background: var(--wb-surface);
+      }
+
+      .panel-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .results-scroll-container {
+        min-height: 0;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .result-stage {
+        min-width: 0;
+        min-height: 480px;
+        padding: 18px;
+        display: grid;
+        flex: 1;
+        place-items: center;
+        position: relative;
+        overflow: hidden;
+        background-color: var(--wb-canvas);
+        background-image: linear-gradient(45deg, var(--panel-soft) 25%, transparent 25%),
+          linear-gradient(-45deg, var(--panel-soft) 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, var(--panel-soft) 75%),
+          linear-gradient(-45deg, transparent 75%, var(--panel-soft) 75%);
+        background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+        background-size: 16px 16px;
+      }
+
+      .result-hero {
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        display: grid;
+        place-items: center;
+        cursor: zoom-in;
+      }
+
+      .result-hero img {
+        display: block;
+        width: auto;
+        max-width: 100%;
+        height: auto;
+        max-height: 64vh;
+        object-fit: contain;
+        border: 1px solid var(--wb-border-soft);
+        border-radius: 3px;
+        box-shadow: 0 18px 54px rgba(0, 0, 0, 0.32);
+      }
+
+      .result-state {
+        width: min(360px, 100%);
+        padding: 24px;
+        display: grid;
+        place-items: center;
+        gap: 12px;
+        color: var(--muted);
+        text-align: center;
+        overflow-wrap: anywhere;
+      }
+
+      .result-state .loader {
+        width: 36px;
+        height: 36px;
+        border-width: 3px;
+      }
+
+      .result-state-mark {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--wb-border);
+        border-radius: 50%;
+        background: var(--panel-soft);
+        color: var(--accent);
+        font-size: 20px;
+      }
+
+      .result-thumbnails {
+        min-height: 94px;
+        padding: 10px;
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        border-top: 1px solid var(--wb-border-soft);
+        background: var(--wb-surface);
+        scrollbar-width: thin;
+      }
+
+      .thumb {
+        width: 74px;
+        height: 74px;
+        flex: 0 0 74px;
+        border-radius: 4px;
+        background: var(--wb-canvas);
+      }
+
+      .thumb:hover {
+        border-color: var(--accent);
+      }
+
+      .thumb-preview {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        padding: 0;
+        border: 0;
+        border-radius: inherit;
+        background: transparent;
+        cursor: zoom-in;
+      }
+
+      .thumb-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .thumb .tag {
+        left: 4px;
+        bottom: 4px;
+        padding: 2px 4px;
+        border: 0;
+        border-radius: 3px;
+        background: rgba(0, 0, 0, 0.72);
+        box-shadow: none;
+        font-size: 9px;
+      }
+
+      .thumb .thumb-close {
+        top: 3px;
+        right: 3px;
+        width: 24px;
+        height: 24px;
+        min-height: 24px;
+        border-radius: 3px;
+        line-height: 22px;
+      }
+
+      .history-card {
+        grid-area: history;
+        width: 100%;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: hidden !important;
+      }
+
+      .history-scroll-container {
+        min-height: 0;
+        padding: 10px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+      }
+
+      .history-list {
+        min-width: max-content;
+        display: flex;
+        gap: 10px;
+      }
+
+      .history-item {
+        width: 310px;
+        min-width: 310px;
+        min-height: 118px;
+        padding: 9px;
+        grid-template-columns: 100px minmax(0, 1fr);
+        gap: 10px;
+        border-radius: 4px;
+        background: var(--panel-soft);
+      }
+
+      .history-item:hover {
+        border-color: var(--accent);
+        transform: none;
+      }
+
+      .history-preview {
+        min-width: 0;
+        display: grid;
+        grid-template-columns: 100px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--text);
+        text-align: left;
+        cursor: zoom-in;
+      }
+
+      .history-thumb {
+        width: 100px;
+        height: 100px;
+        border-radius: 3px;
+      }
+
+      .history-meta {
+        min-width: 0;
+        max-height: 48px;
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+      }
+
+      .history-actions {
+        gap: 4px;
+        margin-top: 7px;
+      }
+
+      .history-actions button {
+        min-height: 28px;
+        padding: 4px 6px;
+        font-size: 10px;
+      }
+
+      .placeholder {
+        padding: 22px;
+        overflow-wrap: anywhere;
+      }
+
+      .status {
+        min-width: 0;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+      }
+
+      .corner-status {
+        left: auto;
+        right: 20px;
+        bottom: 18px;
+        max-width: min(420px, calc(100vw - 40px));
+        padding: 9px 11px;
+        border-radius: var(--wb-radius);
+        background: var(--wb-raised);
+        box-shadow: var(--shadow);
+        font-size: 11px;
+        overflow-wrap: anywhere;
+      }
+
+      .corner-status-content {
+        min-width: 0;
+        display: grid;
+        gap: 6px;
+      }
+
+      .corner-progress {
+        width: min(260px, calc(100vw - 96px));
+      }
+
+      .progress-bar {
+        height: 4px;
+        border-radius: 2px;
+      }
+
+      .progress-fill {
+        background: var(--accent);
+      }
+
+      .progress-caption {
+        color: var(--muted);
+        font-size: 10px;
+        text-align: right;
+      }
+
+      .preview-overlay {
+        padding: 20px;
+        background: rgba(3, 5, 9, 0.82);
+      }
+
+      .preview-body {
+        width: min(1200px, 96vw);
+        max-width: 96vw;
+        max-height: 94vh;
+        padding: 12px;
+        border-radius: var(--wb-radius);
+        background: var(--wb-surface);
+      }
+
+      .preview-body img {
+        max-width: 92vw;
+        max-height: 76vh;
+        border-radius: 3px;
+      }
+
+      .preview-info {
+        top: 12px;
+        right: 12px;
+        bottom: auto;
+        left: auto;
+        max-width: min(340px, calc(100% - 24px));
+        overflow-wrap: anywhere;
+      }
+
+      .preview-toolbar {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .preview-error {
+        margin: 0;
+      }
+
+      @media (max-width: 1080px) {
+        .app-header {
+          align-items: flex-start;
+          flex-wrap: wrap;
+        }
+
+        .header-tools {
+          width: 100%;
+          justify-content: space-between;
+        }
+
+        .layout {
+          grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+        }
+
+        .secondary-actions {
+          max-width: none;
+        }
+      }
+
+      @media (max-width: 780px) {
+        :root {
+          --wb-header-height: auto;
+        }
+
+        body {
+          padding: 0;
+        }
+
+        .app-header {
+          position: relative;
+          padding: 10px 12px;
+          gap: 10px;
+        }
+
+        .brand-subtitle,
+        .model-indicator {
+          display: none;
+        }
+
+        .header-tools {
+          min-width: 0;
+          gap: 6px;
+        }
+
+        .header-settings {
+          min-width: 0;
+          gap: 5px;
+        }
+
+        .language-switch {
+          max-width: min(100%, 230px);
+          overflow-x: auto;
+        }
+
+        .theme-trigger,
+        .lang-btn {
+          min-height: 44px;
+          padding: 8px 10px;
+        }
+
+        .github-link {
+          width: 44px;
+          height: 44px;
+        }
+
+        .layout {
+          height: auto;
+          min-height: 0;
+          padding: 10px 10px 18px;
+          grid-template-columns: minmax(0, 1fr);
+          grid-template-areas:
+            "prompt"
+            "results"
+            "history";
+          gap: 10px;
+        }
+
+        .card {
+          width: 100%;
+        }
+
+        .console-body {
+          padding: 12px;
+          overflow: visible;
+        }
+
+        .prompt-card {
+          height: auto !important;
+          max-height: none !important;
+        }
+
+        input,
+        textarea,
+        select,
+        .model-row button,
+        button {
+          min-height: 44px;
+        }
+
+        .inline-action,
+        .history-actions button,
+        .thumb .thumb-close {
+          min-height: 44px;
+        }
+
+        .model-row {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        input[type="range"] {
+          height: 44px;
+          min-height: 44px;
+        }
+
+        .parameter-grid,
+        .parameter-grid--four,
+        .row {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .action-dock {
+          grid-template-columns: minmax(0, 1fr);
+          padding-bottom: max(12px, env(safe-area-inset-bottom));
+        }
+
+        .secondary-actions {
+          max-width: none;
+          justify-content: stretch;
+        }
+
+        .secondary-actions button {
+          flex: 1 1 calc(50% - 4px);
+        }
+
+        .results-card {
+          min-height: 520px;
+          max-height: none !important;
+          height: auto !important;
+        }
+
+        .result-stage {
+          min-height: 420px;
+          padding: 10px;
+        }
+
+        .result-hero img {
+          max-height: 68vh;
+        }
+
+        .results-scroll-container {
+          max-height: none;
+          padding: 0;
+        }
+
+        .history-scroll-container {
+          max-height: none;
+          padding: 10px;
+        }
+
+        .history-item {
+          width: min(300px, calc(100vw - 42px));
+          min-width: min(300px, calc(100vw - 42px));
+        }
+
+        .corner-status {
+          right: 10px;
+          bottom: 10px;
+          max-width: calc(100vw - 20px);
+        }
+
+        .preview-overlay {
+          padding: 6px;
+        }
+
+        .preview-body {
+          width: 98vw;
+          max-width: 98vw;
+          padding: 8px;
+        }
+
+        .preview-actions {
+          align-items: stretch;
+        }
+
+        .preview-toolbar {
+          width: 100%;
+          margin-left: 0;
+        }
+
+        .preview-toolbar button {
+          flex: 1 1 calc(50% - 4px);
+        }
+      }
+
+      @media (max-width: 420px) {
+        .brand-copy h1 {
+          max-width: 120px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .theme-text strong {
+          max-width: 58px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .lang-btn {
+          padding-inline: 8px;
+        }
+
+        .parameter-grid,
+        .parameter-grid--four,
+        .row {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .result-stage {
+          min-height: 360px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="app" v-cloak>
-      <header>
-        <div style="display: flex; align-items: center; gap: 12px">
+      <header class="app-header">
+        <div class="brand-block">
           <img class="logo" src="./favicon.png" alt="Z-Image Logo" />
-          <h1>Z-Image WebUI</h1>
+          <div class="brand-copy">
+            <h1>Z-Image WebUI</h1>
+            <div class="brand-subtitle">{{ t('header.subtitle') }}</div>
+          </div>
+        </div>
+        <div class="header-tools">
+          <div class="model-indicator" :class="{ error: modelError }" role="status" aria-live="polite">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span class="model-indicator-text">{{ modelStatusLabel }}</span>
+          </div>
+          <div class="header-settings">
+            <div class="theme-switch" ref="themeSwitchRef" :class="{ open: themeMenuOpen }">
+              <button
+                class="theme-trigger"
+                type="button"
+                @click.stop="toggleThemeMenu"
+                :aria-expanded="themeMenuOpen"
+                 aria-haspopup="menu"
+              >
+                <span class="theme-text">
+                  <strong>{{ activeThemeLabel }}</strong>
+                </span>
+                <span class="caret" aria-hidden="true"></span>
+              </button>
+               <div class="theme-dropdown" v-if="themeMenuOpen" role="menu">
+                <button
+                  type="button"
+                  class="theme-option"
+                  v-for="theme in themeOptions"
+                  :key="theme.key"
+                  :class="{ active: activeTheme === theme.key }"
+                  @click.stop="selectTheme(theme.key)"
+                  :style="getThemeButtonStyle(theme.key)"
+                   :aria-checked="activeTheme === theme.key"
+                   role="menuitemradio"
+                >
+                  <span class="theme-name">{{ t(theme.labelKey) }}</span>
+                </button>
+              </div>
+            </div>
+            <div class="language-switch">
+              <button
+                class="lang-btn"
+                :class="{ active: currentLang === 'zh' }"
+                @click="switchLanguage('zh')"
+              >
+                中文
+              </button>
+              <button
+                class="lang-btn"
+                :class="{ active: currentLang === 'en' }"
+                @click="switchLanguage('en')"
+              >
+                EN
+              </button>
+              <button
+                class="lang-btn"
+                :class="{ active: currentLang === 'ja' }"
+                @click="switchLanguage('ja')"
+              >
+                日本語
+              </button>
+            </div>
+          </div>
           <a href="https://github.com/zouyonghe/zimage-webui" target="_blank" rel="noopener noreferrer" title="GitHub Repository" class="github-link">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
             </svg>
           </a>
         </div>
-        <div style="display: flex; align-items: center; gap: 12px">
-          <div class="theme-switch" ref="themeSwitchRef" :class="{ open: themeMenuOpen }">
-            <button
-              class="theme-trigger"
-              type="button"
-              @click.stop="toggleThemeMenu"
-              :aria-expanded="themeMenuOpen"
-              aria-haspopup="listbox"
-            >
-              <div class="theme-text">
-                <strong>{{ activeThemeLabel }}</strong>
-              </div>
-              <span class="caret" aria-hidden="true"></span>
-            </button>
-            <div class="theme-dropdown" v-if="themeMenuOpen">
-              <div
-                class="theme-option"
-                v-for="theme in themeOptions"
-                :key="theme.key"
-                :class="{ active: activeTheme === theme.key }"
-                @click.stop="selectTheme(theme.key)"
-                :style="getThemeButtonStyle(theme.key)"
-              >
-                <div class="theme-name">{{ t(theme.labelKey) }}</div>
-              </div>
-            </div>
-          </div>
-          <div class="language-switch">
-            <button
-              class="lang-btn"
-              :class="{ active: currentLang === 'zh' }"
-              @click="switchLanguage('zh')"
-            >
-              中文
-            </button>
-            <button
-              class="lang-btn"
-              :class="{ active: currentLang === 'en' }"
-              @click="switchLanguage('en')"
-            >
-              EN
-            </button>
-            <button
-              class="lang-btn"
-              :class="{ active: currentLang === 'ja' }"
-              @click="switchLanguage('ja')"
-            >
-              日本語
-            </button>
-          </div>
-        </div>
       </header>
 
       <main class="layout">
       <section class="card prompt-card" ref="promptCardRef">
-        <h2>{{ t('prompt.title') }}</h2>
-        <div class="label-row">
-          <label for="prompt">{{ t('prompt.title') }}</label>
-          <button class="inline-action" :disabled="!prompt" @click="clearPrompt">{{ t('prompt.clear') }}</button>
-        </div>
-        <textarea
-          id="prompt"
-          v-model="prompt"
-          :placeholder="t('prompt.placeholder')"
-        ></textarea>
-
-        <div class="label-row">
-          <label for="negative">{{ t('negative.title') }}</label>
-          <button class="inline-action" :disabled="!negativePrompt" @click="clearNegativePrompt">{{ t('negative.clear') }}</button>
-        </div>
-        <textarea
-          id="negative"
-          v-model="negativePrompt"
-          :placeholder="t('negative.placeholder')"
-        ></textarea>
-
-        <div class="model-row">
+        <div class="console-header">
           <div>
-            <label for="model-select">{{ t('model.label') }}</label>
-            <select id="model-select" v-model="selectedModelId" :disabled="isModelLoadDisabled">
-              <option
-                v-for="model in modelOptions"
-                :key="model.id"
-                :value="model.id"
-                :disabled="model.available === false"
-              >
-                {{ t(model.labelKey) }}{{ model.available === false ? ` (${t('model.unavailable')})` : '' }}
-              </option>
-            </select>
-          </div>
-          <button class="secondary" :disabled="isModelLoadDisabled" @click="loadSelectedModel">
-            {{ modelLoading ? t('model.loading') : t('model.load') }}
-          </button>
-          <div class="status model-status" :class="{ error: modelError }" role="status" aria-live="polite">
-            {{ modelStatusLabel }}
+            <div class="panel-kicker">Z-Image</div>
+            <h2>{{ t('prompt.title') }}</h2>
           </div>
         </div>
 
-        <div class="row">
-          <div>
-            <label for="steps" title="控制推理步数，步数越多越精细但耗时更长">{{ t('steps.label') }} {{ steps }}</label>
-            <input
-              type="range"
-              id="steps"
-              v-model.number="steps"
-              min="4"
-              max="50"
-              step="1"
-            />
-          </div>
-          <div>
-            <label for="guidance" title="提示词引导强度，数值越高越贴合提示词，但过高可能产生伪影">{{ t('guidance.label') }} {{ guidance.toFixed(1) }}</label>
-            <input
-              type="range"
-              id="guidance"
-              v-model.number="guidance"
-              min="0"
-              max="10"
-              step="0.5"
-            />
-          </div>
-        </div>
+        <div class="console-body">
+          <section class="control-section">
+            <h3 class="control-section-title">{{ t('model.label') }}</h3>
+            <div class="model-row">
+              <div>
+                <label for="model-select">{{ t('model.label') }}</label>
+                <select id="model-select" v-model="selectedModelId" :disabled="isModelLoadDisabled">
+                  <option
+                    v-for="model in modelOptions"
+                    :key="model.id"
+                    :value="model.id"
+                    :disabled="model.available === false"
+                  >
+                    {{ t(model.labelKey) }}{{ model.available === false ? ` (${t('model.unavailable')})` : '' }}
+                  </option>
+                </select>
+              </div>
+              <button class="secondary" :disabled="isModelLoadDisabled" @click="loadSelectedModel">
+                {{ modelLoading ? t('model.loading') : t('model.load') }}
+              </button>
+              <div class="status model-status" :class="{ error: modelError }" role="status" aria-live="polite">
+                {{ modelStatusLabel }}
+              </div>
+            </div>
+          </section>
 
-          <div class="row">
-          <div>
-            <label for="height" title="输出图片高度，分辨率越大越耗时与显存">{{ t('height.label') }}</label>
-            <input
-              type="number"
-              id="height"
-              v-model.number="height"
-              min="512"
-              max="1024"
-              step="64"
-              @change="snapDimensions"
-            />
-          </div>
-          <div>
-            <label for="width" title="输出图片宽度，分辨率越大越耗时与显存">{{ t('width.label') }}</label>
-            <input
-              type="number"
-              id="width"
-              v-model.number="width"
-              min="512"
-              max="1024"
-              step="64"
-              @change="snapDimensions"
-            />
-          </div>
-          <div>
-            <label for="seed" title="固定种子以复现同一结果；留空自动随机">{{ t('seed.label') }}</label>
-            <input
-              type="number"
-              id="seed"
-              v-model="seed"
-              :placeholder="t('seed.placeholder')"
-            />
-          </div>
-          <div>
-            <label for="batchCount" title="一次点击连续生成多张图片，最多 10 张">{{ t('batchCount.label') }}</label>
-            <input
-              type="number"
-              id="batchCount"
-              v-model.number="batchCount"
-              min="1"
-              max="10"
-              step="1"
-            />
-          </div>
-        </div>
+          <section class="control-section">
+            <div>
+              <div class="label-row">
+                <label for="prompt">{{ t('prompt.title_simple') }}</label>
+                <button class="inline-action" :disabled="!prompt" @click="clearPrompt">{{ t('prompt.clear') }}</button>
+              </div>
+              <textarea id="prompt" v-model="prompt" :placeholder="t('prompt.placeholder')"></textarea>
+            </div>
+            <div class="negative-field">
+              <div class="label-row">
+                <label for="negative">{{ t('negative.title') }}</label>
+                <button class="inline-action" :disabled="!negativePrompt" @click="clearNegativePrompt">{{ t('negative.clear') }}</button>
+              </div>
+              <textarea id="negative" v-model="negativePrompt" :placeholder="t('negative.placeholder')"></textarea>
+            </div>
+          </section>
 
-        <div>
-          <label>{{ t('ratio.label') }}</label>
-          <select v-model="selectedRatio" @change="onRatioChange">
-            <option v-for="ratio in ratios" :key="ratio.label" :value="ratio.label">
-              {{ ratio.label }} ({{ ratio.width }}×{{ ratio.height }})
-            </option>
-          </select>
-        </div>
-        <div>
-          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <div style="flex:1; min-width: 200px;">
-              <label>{{ t('upscale.scale') }}: {{ upscaleScale.toFixed(1) }}×</label>
+          <section class="control-section">
+            <h3 class="control-section-title">{{ t('steps.label') }}</h3>
+            <div class="parameter-grid">
+              <div>
+                <label class="field-value-label" for="steps" title="控制推理步数，步数越多越精细但耗时更长">
+                  <span>{{ t('steps.label') }}</span><strong>{{ steps }}</strong>
+                </label>
+                <input type="range" id="steps" v-model.number="steps" min="4" max="50" step="1" />
+              </div>
+              <div>
+                <label class="field-value-label" for="guidance" title="提示词引导强度，数值越高越贴合提示词，但过高可能产生伪影">
+                  <span>{{ t('guidance.label') }}</span><strong>{{ guidance.toFixed(1) }}</strong>
+                </label>
+                <input type="range" id="guidance" v-model.number="guidance" min="0" max="10" step="0.5" />
+              </div>
+            </div>
+          </section>
+
+          <section class="control-section">
+            <h3 class="control-section-title">{{ t('ratio.label') }}</h3>
+            <div>
+              <label for="ratio-select">{{ t('ratio.label') }}</label>
+              <select id="ratio-select" v-model="selectedRatio" @change="onRatioChange">
+                <option v-for="ratio in ratios" :key="ratio.label" :value="ratio.label">
+                  {{ ratio.label }} ({{ ratio.width }}×{{ ratio.height }})
+                </option>
+              </select>
+            </div>
+            <div class="parameter-grid parameter-grid--four">
+              <div>
+                <label for="width" title="输出图片宽度，分辨率越大越耗时与显存">{{ t('width.label') }}</label>
+                <input type="number" id="width" v-model.number="width" min="512" max="1024" step="64" @change="snapDimensions" />
+              </div>
+              <div>
+                <label for="height" title="输出图片高度，分辨率越大越耗时与显存">{{ t('height.label') }}</label>
+                <input type="number" id="height" v-model.number="height" min="512" max="1024" step="64" @change="snapDimensions" />
+              </div>
+              <div>
+                <label for="seed" title="固定种子以复现同一结果；留空自动随机">{{ t('seed.label') }}</label>
+                <input type="number" id="seed" v-model="seed" :placeholder="t('seed.placeholder')" />
+              </div>
+              <div>
+                <label for="batchCount" title="一次点击连续生成多张图片，最多 10 张">{{ t('batchCount.label') }}</label>
+                <input type="number" id="batchCount" v-model.number="batchCount" min="1" max="10" step="1" />
+              </div>
+            </div>
+          </section>
+
+          <section class="control-section">
+            <h3 class="control-section-title">{{ t('upscale.title') }}</h3>
+            <div class="upscale-control">
+              <label class="field-value-label">
+                <span>{{ t('upscale.scale') }}</span><strong>{{ upscaleScale.toFixed(1) }}×</strong>
+              </label>
               <input
                 class="upscale-range"
                 type="range"
@@ -1239,111 +2364,117 @@
                 :disabled="loading || batchRunning || upscaleLoading"
               />
             </div>
+          </section>
+        </div>
+
+        <div class="action-dock">
+          <button class="primary" :disabled="isGenerateDisabled" @click="generate()">
+            {{ loading ? t('generate.loading') : t('generate.button') }}
+          </button>
+          <div class="secondary-actions">
+            <button class="secondary" :disabled="!(loading || batchRunning) || stopRequested" @click="requestStop">
+              {{ stopRequested ? t('stop.requested') : t('stop.button') }}
+            </button>
+            <button class="secondary" :disabled="loading || batchRunning" @click="randomizeSeed">{{ t('randomSeed.button') }}</button>
+            <button
+              class="secondary"
+              :class="{ primary: autoUpscaleEnabled, 'auto-upscale-active': autoUpscaleEnabled }"
+              :disabled="upscaleLoading"
+              @click="toggleAutoUpscale"
+            >
+              {{ t('upscale.autoLabel') }}
+            </button>
+            <button class="secondary" :disabled="loading || batchRunning" @click="resetPrompt">{{ t('reset.button') }}</button>
+            <button class="secondary" :disabled="!image || loading || batchRunning" @click="downloadImage">{{ t('save.button') }}</button>
           </div>
         </div>
-
-        <div class="actions">
-        <button class="primary" :disabled="isGenerateDisabled" @click="generate()">
-          {{ loading ? t('generate.loading') : t('generate.button') }}
-        </button>
-          <button
-            class="secondary"
-            :disabled="!(loading || batchRunning) || stopRequested"
-            @click="requestStop"
-          >
-            {{ stopRequested ? t('stop.requested') : t('stop.button') }}
-          </button>
-          <button class="secondary" :disabled="loading || batchRunning" @click="randomizeSeed">{{ t('randomSeed.button') }}</button>
-          <button
-            class="secondary"
-            :class="{ primary: autoUpscaleEnabled, 'auto-upscale-active': autoUpscaleEnabled }"
-            :disabled="upscaleLoading"
-            @click="toggleAutoUpscale"
-          >
-            {{ t('upscale.autoLabel') }}
-          </button>
-          <button class="secondary" :disabled="loading || batchRunning" @click="resetPrompt">{{ t('reset.button') }}</button>
-          <button class="secondary" :disabled="!image || loading || batchRunning" @click="downloadImage">{{ t('save.button') }}</button>
-        </div>
-
-      <!-- meta pills removed per request -->
       </section>
 
       <section class="card card-scroll results-card-flex results-card" :style="syncedCardStyle">
-        <div style="display:flex; align-items:center; gap:10px; justify-content: space-between; flex-wrap: wrap;">
-          <h2 style="margin:0;">{{ t('results.title') }}</h2>
-          <button class="secondary" :disabled="!results.length" @click="downloadImage">{{ t('results.downloadAll') }}</button>
+        <div class="panel-header">
+          <div>
+            <div class="panel-kicker">Canvas</div>
+            <h2>{{ t('results.title') }}</h2>
+          </div>
+          <div class="panel-header-actions">
+            <button class="secondary" :disabled="!results.length" @click="downloadImage">{{ t('results.downloadAll') }}</button>
+          </div>
         </div>
         <div class="results-scroll-container" ref="resultsScrollRef">
-          <div v-if="results.length" class="image-grid">
+          <div class="result-stage">
             <div
-              class="thumb"
-              v-for="(item, idx) in results"
-              :key="item.id"
-              @click="openPreview(idx)"
+              v-if="results.length"
+              class="result-hero"
+              tabindex="0"
+              role="button"
+              :aria-label="t('results.title')"
+              @click="openPreview(results.length - 1)"
+              @keydown.enter="openPreview(results.length - 1)"
+              @keydown.space.prevent="openPreview(results.length - 1)"
             >
-              <button class="thumb-close" @click.stop="deleteResult(item.id)">×</button>
-              <img :src="item.image" :alt="`${t('results.title')} ${idx + 1}`" />
+              <img :src="results[results.length - 1].image" :alt="t('results.title')" />
+            </div>
+            <div v-else-if="loading || batchRunning || upscaleLoading" class="result-state" role="status" aria-live="polite">
+              <div class="loader"></div>
+              <div class="status">{{ upscaleProgressLabel || imageProgressLabel || statusLabel }}</div>
+            </div>
+            <div v-else class="result-state placeholder">
+              <div class="result-state-mark" aria-hidden="true">+</div>
+              <div>{{ t('results.placeholder') }}</div>
+            </div>
+          </div>
+          <div v-if="results.length" class="result-thumbnails">
+            <div class="thumb" v-for="(item, idx) in results" :key="item.id">
+              <button class="thumb-preview" type="button" :aria-label="`${t('results.title')} ${idx + 1}`" @click="openPreview(idx)">
+                <img :src="item.image" :alt="`${t('results.title')} ${idx + 1}`" />
+              </button>
+              <button class="thumb-close" :aria-label="t('history.delete')" @click.stop="deleteResult(item.id)" @keydown.stop>×</button>
               <div class="tag">{{ item.meta.width }}×{{ item.meta.height }}</div>
             </div>
           </div>
-          <div v-else class="placeholder">
-            {{ t('results.placeholder') }}
-          </div>
-          <div
-            v-if="loading || batchRunning || upscaleLoading"
-            style="margin-top: 12px; display: grid; place-items: center; gap: 6px;"
-          >
-            <div class="loader"></div>
-            <div class="status" style="margin:0; text-align:center;">
-              {{ upscaleProgressLabel || imageProgressLabel || statusLabel }}
-            </div>
-          </div>
-        </div>
       </section>
 
       <section class="card card-scroll history-card-flex history-card" :style="syncedCardStyle">
         <div class="history-header">
-          <h2>{{ t('history.title') }}</h2>
+          <div>
+            <div class="panel-kicker">Filmstrip</div>
+            <h2>{{ t('history.title') }}</h2>
+          </div>
           <button class="secondary" :disabled="history.length === 0" @click="clearHistory">{{ t('history.clear') }}</button>
         </div>
         <div class="history-scroll-container">
           <div v-if="history.length === 0" class="placeholder">{{ t('history.placeholder') }}</div>
           <div v-else class="history-list">
-            <div
-              class="history-item"
-              v-for="(item, idx) in history"
-              :key="item.id"
-              @click="openPreview(idx, 'history')"
-              :title="t('history.title')"
-            >
-              <img class="history-thumb" :src="item.image" alt="历史缩略图" />
-              <div>
+            <div class="history-item" v-for="(item, idx) in history" :key="item.id">
+              <button class="history-preview" type="button" :aria-label="`${t('history.title')} ${idx + 1}`" @click="openPreview(idx, 'history')">
+                <img class="history-thumb" :src="item.image" :alt="t('history.title')" />
+                <div>
                 <div class="history-meta">
                 <div>{{ t('history.steps') }}: {{ item.steps }} | {{ t('history.guidance') }}: {{ item.guidance }} | {{ t('history.seed') }}: {{ item.seed ?? t('seed.placeholder') }}</div>
                 <div>{{ t('history.size') }}: {{ item.width }}×{{ item.height }}</div>
                 <div v-if="item.negative">{{ t('history.negative') }}: {{ item.negative }}</div>
                 <div v-if="item.scale && item.scale !== 1">{{ t('meta.scale') }}: {{ item.scale }}×</div>
               </div>
+                </div>
+              </button>
               <div class="history-actions">
-                <button class="secondary" @click.stop="applyHistory(item)">{{ t('history.refill') }}</button>
-                <button class="secondary" @click.stop="regenerate(item)">{{ t('history.regenerate') }}</button>
-                <button class="secondary" @click.stop="deleteHistory(item.id)">{{ t('history.delete') }}</button>
+                <button class="secondary" @click.stop="applyHistory(item)" @keydown.stop>{{ t('history.refill') }}</button>
+                <button class="secondary" @click.stop="regenerate(item)" @keydown.stop>{{ t('history.regenerate') }}</button>
+                <button class="secondary" @click.stop="deleteHistory(item.id)" @keydown.stop>{{ t('history.delete') }}</button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
       </section>
         <div class="corner-status" :class="{ 'corner-status--active': loading || batchRunning || upscaleLoading }">
         <div class="dot" :style="{ background: statusTone }"></div>
-        <div style="display:grid; gap:6px;">
+        <div class="corner-status-content">
           <div>{{ statusLabel }}</div>
           <div class="corner-progress" v-if="overallProgressActive">
             <div class="progress-bar">
               <div class="progress-fill" :style="{ width: overallProgressPercent + '%' }"></div>
             </div>
-            <div style="font-size:12px; color: var(--muted); text-align:right;">{{ overallProgressLabel }}</div>
+            <div class="progress-caption">{{ overallProgressLabel }}</div>
           </div>
         </div>
       </div>
@@ -1358,9 +2489,8 @@
             @click.left.stop="nextImage"
           />
           <div
-            class="thumb-info"
+            class="thumb-info preview-info"
             v-if="showInfoOverlay && currentPreviewItem"
-            style="max-width: 340px; top: 12px; right: 12px; left: auto; bottom: auto;"
           >
             <div>{{ t('meta.size') }}: {{ currentPreviewItem.meta?.width }}×{{ currentPreviewItem.meta?.height }}</div>
             <div>{{ t('meta.steps') }}: {{ currentPreviewItem.meta?.steps ?? steps }}</div>
@@ -1374,11 +2504,10 @@
               <button class="secondary" @click.stop="prevImage" :disabled="!hasPrev">{{ t('preview.previous') }}</button>
               <button class="secondary" @click.stop="nextImage" :disabled="!hasNext">{{ t('preview.next') }}</button>
             </div>
-            <div style="display:flex; gap:8px; margin-left:auto;">
+            <div class="preview-toolbar">
               <button
                 class="secondary"
                 :class="{ 'auto-upscale-active': showInfoOverlay }"
-                style="padding: 10px 12px; min-width: 100px;"
                 @click.stop="showInfoOverlay = !showInfoOverlay"
               >
                 {{ t('preview.info') }}
@@ -1398,7 +2527,7 @@
               >
                 {{ upscaleLoading ? t('upscale.running') : t('upscale.button') }}
               </button>
-              <div class="status" style="margin:0;" :class="{'error': upscaleError}">
+              <div class="status preview-error" :class="{'error': upscaleError}">
                 <span v-if="upscaleError">⚠ {{ upscaleError }}</span>
               </div>
               <button class="secondary" @click.stop="downloadPreviewImage">{{ t('preview.download') }}</button>
@@ -1436,8 +2565,8 @@
               'negative.placeholder': '不想出现的元素，例如：low quality, blurry, watermark',
               'negative.clear': '清空',
               'model.label': '模型',
-              'model.base': '基础版',
-              'model.turbo': '极速版',
+              'model.base': 'Z-Image',
+              'model.turbo': 'Z-Image-Turbo',
               'model.load': '加载模型',
               'model.loading': '正在加载模型',
               'model.active': '当前模型',
@@ -1519,8 +2648,8 @@
               'negative.placeholder': 'Elements to avoid, e.g.: low quality, blurry, watermark',
               'negative.clear': 'Clear',
               'model.label': 'Model',
-              'model.base': 'Base',
-              'model.turbo': 'Turbo',
+              'model.base': 'Z-Image',
+              'model.turbo': 'Z-Image-Turbo',
               'model.load': 'Load Model',
               'model.loading': 'Loading Model',
               'model.active': 'Active model',
@@ -1602,8 +2731,8 @@
               'negative.placeholder': '含めたくない要素 例: low quality, blurry, watermark',
               'negative.clear': 'クリア',
               'model.label': 'モデル',
-              'model.base': 'ベース',
-              'model.turbo': 'ターボ',
+              'model.base': 'Z-Image',
+              'model.turbo': 'Z-Image-Turbo',
               'model.load': 'モデルを読み込む',
               'model.loading': 'モデルを読み込み中',
               'model.active': '使用中のモデル',
@@ -1680,21 +2809,21 @@
             midnight: {
               mode: "dark",
               vars: {
-                "bg-base": "#0f172a",
-                "bg-1": "#1e293b",
-                "bg-2": "#1d1b2f",
-                panel: "rgba(255, 255, 255, 0.06)",
-                "panel-strong": "rgba(255, 255, 255, 0.12)",
-                "panel-soft": "rgba(255, 255, 255, 0.04)",
-                "input-bg": "rgba(255, 255, 255, 0.06)",
-                "control-surface": "rgba(255, 255, 255, 0.08)",
-                accent: "#7c3aed",
-                "accent-2": "#22d3ee",
-                text: "#e2e8f0",
-                muted: "#94a3b8",
+                "bg-base": "#0b0d12",
+                "bg-1": "#12161f",
+                "bg-2": "#171b26",
+                panel: "#12161f",
+                "panel-strong": "rgba(148, 163, 184, 0.20)",
+                "panel-soft": "rgba(148, 163, 184, 0.08)",
+                "input-bg": "#0e1118",
+                "control-surface": "#171b25",
+                accent: "#7c6cff",
+                "accent-2": "#5b8cff",
+                text: "#edf0f7",
+                muted: "#929bad",
                 success: "#4ade80",
                 danger: "#f87171",
-                shadow: "0 20px 50px rgba(0, 0, 0, 0.25)",
+                shadow: "0 12px 32px rgba(0, 0, 0, 0.22)",
               },
             },
             dawn: {
@@ -1987,7 +3116,7 @@
             { key: "glacier", labelKey: "theme.glacier" },
             { key: "forest", labelKey: "theme.forest" },
           ];
-          const activeTheme = ref(localStorage.getItem('zimage-theme') || 'dawn');
+          const activeTheme = ref(localStorage.getItem('zimage-theme') || 'midnight');
           const themeMenuOpen = ref(false);
           const themeSwitchRef = ref(null);
           const getThemeButtonStyle = (key) => {
@@ -2121,15 +3250,7 @@
                 overflow: "auto",
               };
             }
-            if (stackedLayout.value && promptCardHeight.value) {
-              const gapPx = 20;
-              const total = Math.max(promptCardHeight.value - gapPx, 320);
-              const half = Math.max(220, total / 2);
-              return { height: `${half}px`, minHeight: `${half}px`, maxHeight: `${half}px`, overflow: "auto" };
-            }
-            if (!promptCardHeight.value) return {};
-            const h = promptCardHeight.value;
-            return { height: `${h}px`, minHeight: `${h}px`, maxHeight: `${h}px`, overflow: "auto" };
+            return { height: "auto", minHeight: "0", maxHeight: "none", overflow: "visible" };
           });
           watch(
             () => [

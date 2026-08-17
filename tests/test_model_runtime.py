@@ -459,7 +459,7 @@ class ModelRuntimeTests(unittest.TestCase):
         info.do_GET()
         info_payload = info._send_json.call_args.args[1]
         self.assertEqual("base", info_payload["active_model"])
-        self.assertEqual("Z-Image Base", info_payload["model"])
+        self.assertEqual("Z-Image", info_payload["model"])
         self.assertEqual(50, info_payload["defaults"]["steps"])
         self.assertEqual(4.0, info_payload["defaults"]["guidance"])
         self.assertFalse(info_payload["defaults"]["cfg_normalization"])

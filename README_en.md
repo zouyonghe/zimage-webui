@@ -25,7 +25,7 @@ Z-Image WebUI is a lightweight image generation interface based on local AI mode
 - 💾 **Auto-save** - Generation results automatically saved locally with complete metadata
 - 🔍 **HD Upscaling** - Built-in Real-ESRGAN super-resolution technology, support 1-4x magnification
 - 🔎 **Magnifier Feature** - Detail viewing during preview, saves performance
-- 🎯 **Model Switching** - Explicitly switch between local Z-Image Base and Z-Image-Turbo weights
+- 🎯 **Model Switching** - Explicitly switch between local Z-Image and Z-Image-Turbo weights
 
 ## 🚀 Quick Start
 

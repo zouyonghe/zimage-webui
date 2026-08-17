@@ -19,13 +19,13 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 DEFAULT_PROMPT = "a cat sitting on a chair, high quality, detailed"
 MODEL_CONFIGS = {
     "turbo": {
-        "display_name": "Z-Image Turbo",
+        "display_name": "Z-Image-Turbo",
         "path": ROOT / "zimage-model",
         "steps": 9,
         "guidance": 0.0,
     },
     "base": {
-        "display_name": "Z-Image Base",
+        "display_name": "Z-Image",
         "path": ROOT / "zimage-base-model",
         "steps": 50,
         "guidance": 4.0,

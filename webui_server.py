@@ -53,12 +53,12 @@ ROOT = Path(__file__).parent
 WEB_DIR = ROOT / "webui"
 MODEL_REGISTRY = {
     "turbo": {
-        "display_name": "Z-Image Turbo",
+        "display_name": "Z-Image-Turbo",
         "path": ROOT / "zimage-model",
         "defaults": {"steps": 9, "guidance": 0.0, "cfg_normalization": False},
     },
     "base": {
-        "display_name": "Z-Image Base",
+        "display_name": "Z-Image",
         "path": ROOT / "zimage-base-model",
         "defaults": {"steps": 50, "guidance": 4.0, "cfg_normalization": False},
     },

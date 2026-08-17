@@ -3,33 +3,42 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-MODEL_DIR="$ROOT_DIR/zimage-model"
 WEIGHTS_DIR="$ROOT_DIR/weights"
-
-base="https://hf-mirror.com/Tongyi-MAI/Z-Image-Turbo/resolve/main"
 realesrgan_url="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth"
-
-files=(
-"text_encoder/model-00001-of-00003.safetensors"  # text encoder shard 1/3
-"text_encoder/model-00002-of-00003.safetensors"  # text encoder shard 2/3
-"text_encoder/model-00003-of-00003.safetensors"  # text encoder shard 3/3
-
-"transformer/diffusion_pytorch_model-00001-of-00003.safetensors"  # transformer shard 1/3
-"transformer/diffusion_pytorch_model-00002-of-00003.safetensors"  # transformer shard 2/3
-"transformer/diffusion_pytorch_model-00003-of-00003.safetensors"  # transformer shard 3/3
-
-"vae/diffusion_pytorch_model.safetensors"  # VAE
-)
+variant="${1:-all}"
 
 cd "$ROOT_DIR"
 
-for f in "${files[@]}"; do
-    target_dir="$MODEL_DIR/$(dirname "$f")"
-    target_file="$(basename "$f")"
-    mkdir -p "$target_dir"
-    echo "Downloading $f -> $MODEL_DIR/$f"
-    aria2c -x 16 -s 16 -k 5M "$base/$f" -d "$target_dir" -o "$target_file"
-done
+command -v hf >/dev/null || {
+    echo "Missing hf CLI. Install it with: pip install -U huggingface_hub" >&2
+    exit 1
+}
+
+export HF_HUB_DISABLE_XET="${HF_HUB_DISABLE_XET:-1}"
+
+download_model() {
+    local repo="$1"
+    local target="$2"
+    echo "Downloading $repo -> $target"
+    hf download "$repo" --local-dir "$target" --max-workers "${HF_MAX_WORKERS:-1}"
+}
+
+case "$variant" in
+    turbo)
+        download_model "Tongyi-MAI/Z-Image-Turbo" "$ROOT_DIR/zimage-model"
+        ;;
+    base)
+        download_model "Tongyi-MAI/Z-Image" "$ROOT_DIR/zimage-base-model"
+        ;;
+    all)
+        download_model "Tongyi-MAI/Z-Image-Turbo" "$ROOT_DIR/zimage-model"
+        download_model "Tongyi-MAI/Z-Image" "$ROOT_DIR/zimage-base-model"
+        ;;
+    *)
+        echo "Usage: $0 [turbo|base|all]" >&2
+        exit 2
+        ;;
+esac
 
 # Download Real-ESRGAN weight
 mkdir -p "$WEIGHTS_DIR"

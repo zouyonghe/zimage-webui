@@ -25,7 +25,7 @@ Z-Image WebUI is a lightweight image generation interface based on local AI mode
 - 💾 **Auto-save** - Generation results automatically saved locally with complete metadata
 - 🔍 **HD Upscaling** - Built-in Real-ESRGAN super-resolution technology, support 1-4x magnification
 - 🔎 **Magnifier Feature** - Detail viewing during preview, saves performance
-- 🎯 **Ready to Use** - Auto-fill example prompts on first load
+- 🎯 **Model Switching** - Explicitly switch between local Z-Image Base and Z-Image-Turbo weights
 
 ## 🚀 Quick Start
 
@@ -57,16 +57,18 @@ Z-Image WebUI is a lightweight image generation interface based on local AI mode
 
 4. **Download Model Weights**
    ```bash
-   cd scripts && bash download_models.sh && cd ..
+   hf download Tongyi-MAI/Z-Image-Turbo --local-dir ./zimage-model
+   hf download Tongyi-MAI/Z-Image --local-dir ./zimage-base-model
    ```
+   If downloads fail, set `HF_ENDPOINT=https://hf-mirror.com` and `HF_HUB_DISABLE_XET=1`.
 
 ### Start Service
 
 ```bash
-python webui_server.py
+ZIMAGE_CPU_OFFLOAD=1 python webui_server.py
 ```
 
-Service runs on `http://localhost:9000` by default, you can change the port via environment variable `ZIMAGE_PORT`.
+Service runs on `http://localhost:9000` by default, you can change the port via environment variable `ZIMAGE_PORT`. It starts without loading a model; select one in the WebUI and click **Load Model**. It listens on localhost by default; set `ZIMAGE_HOST=0.0.0.0` only when network access is protected by a firewall or reverse proxy.
 
 ### Command Line Usage
 
@@ -76,6 +78,7 @@ python zimage.py
 
 # Use custom prompt
 python zimage.py "a scenic mountain landscape"
+python zimage.py --model base "a scenic mountain landscape"
 ```
 
 ## 📁 Project Structure
@@ -88,6 +91,7 @@ zimage-webui/
 ├── webui_server.py          # Web server and API
 ├── zimage.py               # Command line tool
 ├── zimage-model/           # AI model weights directory
+├── zimage-base-model/      # Z-Image Base weights directory
 ├── weights/                # Upscaling model weights
 ├── outputs/                # Generation results save directory
 ├── scripts/                # Helper scripts
@@ -130,6 +134,7 @@ zimage-webui/
 |----------|---------|-------------|
 | `ZIMAGE_PORT` | 9000 | Web service port |
 | `ZIMAGE_UPSCALE_MODEL` | weights/RealESRGAN_x4plus.pth | Upscaling model path |
+| `ZIMAGE_CPU_OFFLOAD` | disabled | Move part of the model to system memory to reduce VRAM usage |
 
 ### Custom Configuration
 
@@ -164,6 +169,11 @@ pip install realesrgan --no-deps
 - Reduce generation resolution
 - Lower batch generation count
 - Disable auto upscaling
+- Set `ZIMAGE_CPU_OFFLOAD=1`; recommended on 24GB GPUs
+
+**Q: Which model should I choose?**
+- `Z-Image-Turbo`: about 9 steps and guidance 0, faster generation
+- `Z-Image`: about 28-50 steps and guidance 3-5, higher quality and diversity
 
 **Q: Model download failed**
 ```bash

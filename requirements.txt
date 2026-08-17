@@ -3,7 +3,12 @@
 # torchvision==0.20.1
 
 # WebUI / pipeline
-diffusers>=0.29.2
+diffusers>=0.37.0
+transformers
+accelerate
+safetensors
+sentencepiece
+protobuf
 numpy<2.3
 scipy
 Pillow

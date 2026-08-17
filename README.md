@@ -25,7 +25,7 @@ Z-Image WebUI 是一个基于本地 AI 模型的轻量级图像生成界面，�
 - 💾 **自动保存** - 生成结果自动保存到本地，包含完整元数据
 - 🔍 **高清放大** - 内置 Real-ESRGAN 超分辨率技术，支持 1-4 倍放大
 - 🔎 **放大镜功能** - 预览时提供细节查看，节省性能
-- 🎯 **即开即用** - 首次加载自动填充示例提示词
+- 🎯 **双模型切换** - 支持 Z-Image Base 和 Z-Image-Turbo，前端可显式切换权重
 
 ## 🚀 快速开始
 
@@ -57,16 +57,19 @@ Z-Image WebUI 是一个基于本地 AI 模型的轻量级图像生成界面，�
 
 4. **下载模型权重**
    ```bash
-   cd scripts && bash download_models.sh && cd ..
+   hf download Tongyi-MAI/Z-Image-Turbo --local-dir ./zimage-model
+   hf download Tongyi-MAI/Z-Image --local-dir ./zimage-base-model
    ```
+   下载失败时可设置 `HF_ENDPOINT=https://hf-mirror.com` 和 `HF_HUB_DISABLE_XET=1`。
 
 ### 启动服务
 
 ```bash
-python webui_server.py
+ZIMAGE_CPU_OFFLOAD=1 python webui_server.py
 ```
 
-服务默认运行在 `http://localhost:9000`，您可以通过环境变量 `ZIMAGE_PORT` 修改端口。
+服务默认运行在 `http://localhost:9000`，您可以通过环境变量 `ZIMAGE_PORT` 修改端口。启动后不会自动加载模型，请在 WebUI 中选择模型并点击“加载模型”。
+默认只监听本机；如需局域网访问，显式设置 `ZIMAGE_HOST=0.0.0.0`，并在防火墙或反向代理层保护模型加载接口。
 
 ### 命令行使用
 
@@ -76,6 +79,7 @@ python zimage.py
 
 # 使用自定义提示词
 python zimage.py "a scenic mountain landscape"
+python zimage.py --model base "a scenic mountain landscape"
 ```
 
 ## 📁 项目结构
@@ -88,6 +92,7 @@ zimage-webui/
 ├── webui_server.py          # Web 服务器和 API
 ├── zimage.py               # 命令行工具
 ├── zimage-model/           # AI 模型权重目录
+├── zimage-base-model/      # Z-Image Base 权重目录
 ├── weights/                # 超分模型权重
 ├── outputs/                # 生成结果保存目录
 ├── scripts/                # 辅助脚本
@@ -104,7 +109,7 @@ zimage-webui/
 | 提示词 | 描述希望生成的内容 | 任意文本 |
 | 负面词 | 描述不希望出现的内容 | 任意文本 |
 | 生成步数 | 控制生成质量 | 1-50 |
-| 引导强度 | 控制对提示词的遵循程度 | 1.0-20.0 |
+| 引导强度 | 控制对提示词的遵循程度 | 0.0-20.0 |
 | 随机种子 | 控制生成的随机性 | 任意整数或留空 |
 
 ### 画幅预设
@@ -130,6 +135,7 @@ zimage-webui/
 |--------|--------|------|
 | `ZIMAGE_PORT` | 9000 | Web 服务端口 |
 | `ZIMAGE_UPSCALE_MODEL` | weights/RealESRGAN_x4plus.pth | 超分模型路径 |
+| `ZIMAGE_CPU_OFFLOAD` | 未启用 | 将部分模型权重放入系统内存以降低显存占用 |
 
 ### 自定义配置
 
@@ -164,6 +170,11 @@ pip install realesrgan --no-deps
 - 减小生成分辨率
 - 降低批量生成数量
 - 关闭自动放大功能
+- 设置 `ZIMAGE_CPU_OFFLOAD=1`，24GB 显卡建议启用
+
+**Q: 如何选择模型**
+- `Z-Image-Turbo`：约 9 steps、guidance 0，速度更快
+- `Z-Image`：约 28-50 steps、guidance 3-5，质量和多样性更高
 
 **Q: 模型下载失败**
 ```bash

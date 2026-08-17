@@ -285,6 +285,23 @@
         gap: 12px;
       }
 
+      .model-row {
+        display: grid;
+        grid-template-columns: minmax(150px, 1fr) auto;
+        gap: 10px;
+        align-items: end;
+        margin-top: 12px;
+      }
+
+      .model-row label {
+        margin-top: 0;
+      }
+
+      .model-status {
+        grid-column: 1 / -1;
+        margin-top: 0;
+      }
+
       .actions {
         display: flex;
         gap: 10px;
@@ -942,6 +959,12 @@
         .image-frame {
           aspect-ratio: 1 / 1;
         }
+        .model-row {
+          grid-template-columns: 1fr;
+        }
+        .model-row button {
+          width: 100%;
+        }
         .results-card-flex,
         .history-card-flex {
           max-height: 70vh;
@@ -1100,6 +1123,28 @@
           :placeholder="t('negative.placeholder')"
         ></textarea>
 
+        <div class="model-row">
+          <div>
+            <label for="model-select">{{ t('model.label') }}</label>
+            <select id="model-select" v-model="selectedModelId" :disabled="isModelLoadDisabled">
+              <option
+                v-for="model in modelOptions"
+                :key="model.id"
+                :value="model.id"
+                :disabled="model.available === false"
+              >
+                {{ t(model.labelKey) }}{{ model.available === false ? ` (${t('model.unavailable')})` : '' }}
+              </option>
+            </select>
+          </div>
+          <button class="secondary" :disabled="isModelLoadDisabled" @click="loadSelectedModel">
+            {{ modelLoading ? t('model.loading') : t('model.load') }}
+          </button>
+          <div class="status model-status" :class="{ error: modelError }" role="status" aria-live="polite">
+            {{ modelStatusLabel }}
+          </div>
+        </div>
+
         <div class="row">
           <div>
             <label for="steps" title="控制推理步数，步数越多越精细但耗时更长">{{ t('steps.label') }} {{ steps }}</label>
@@ -1108,7 +1153,7 @@
               id="steps"
               v-model.number="steps"
               min="4"
-              max="30"
+              max="50"
               step="1"
             />
           </div>
@@ -1390,6 +1435,16 @@
               'negative.title': '负面提示词',
               'negative.placeholder': '不想出现的元素，例如：low quality, blurry, watermark',
               'negative.clear': '清空',
+              'model.label': '模型',
+              'model.base': '基础版',
+              'model.turbo': '极速版',
+              'model.load': '加载模型',
+              'model.loading': '正在加载模型',
+              'model.active': '当前模型',
+              'model.none': '尚未加载模型',
+              'model.unavailable': '不可用',
+              'model.fetchFailed': '无法获取模型状态',
+              'model.loadFailed': '模型加载失败',
               'steps.label': '采样步数',
               'guidance.label': '引导强度',
               'height.label': '高度 (px)',
@@ -1463,6 +1518,16 @@
               'negative.title': 'Negative Prompt',
               'negative.placeholder': 'Elements to avoid, e.g.: low quality, blurry, watermark',
               'negative.clear': 'Clear',
+              'model.label': 'Model',
+              'model.base': 'Base',
+              'model.turbo': 'Turbo',
+              'model.load': 'Load Model',
+              'model.loading': 'Loading Model',
+              'model.active': 'Active model',
+              'model.none': 'No model loaded',
+              'model.unavailable': 'Unavailable',
+              'model.fetchFailed': 'Could not fetch model status',
+              'model.loadFailed': 'Model load failed',
               'steps.label': 'Sampling Steps',
               'guidance.label': 'Guidance Scale',
               'height.label': 'Height (px)',
@@ -1536,6 +1601,16 @@
               'negative.title': 'ネガティブプロンプト',
               'negative.placeholder': '含めたくない要素 例: low quality, blurry, watermark',
               'negative.clear': 'クリア',
+              'model.label': 'モデル',
+              'model.base': 'ベース',
+              'model.turbo': 'ターボ',
+              'model.load': 'モデルを読み込む',
+              'model.loading': 'モデルを読み込み中',
+              'model.active': '使用中のモデル',
+              'model.none': 'モデル未読み込み',
+              'model.unavailable': '利用不可',
+              'model.fetchFailed': 'モデル状態を取得できません',
+              'model.loadFailed': 'モデルの読み込みに失敗しました',
               'steps.label': 'サンプリングステップ',
               'guidance.label': 'ガイダンス強度',
               'height.label': '高さ (px)',
@@ -1731,7 +1806,18 @@
           const batchTotal = ref(0);
           const stopRequested = ref(false);
           const loading = ref(false);
-          const modelLoading = ref(true);
+          const modelOptions = ref([
+            { id: "base", labelKey: "model.base", available: null, defaults: null },
+            { id: "turbo", labelKey: "model.turbo", available: null, defaults: null },
+          ]);
+          const selectedModelId = ref("turbo");
+          const activeModelId = ref(null);
+          const activeModelDefaults = ref(null);
+          const modelLoadPending = ref(false);
+          const serverModelLoading = ref(false);
+          const modelLoading = computed(() => modelLoadPending.value || serverModelLoading.value);
+          let modelStateGeneration = 0;
+          let healthPollTimer = null;
           const modelError = ref("");
           const error = ref("");
           const stepProgress = ref({ current: 0, total: 0 });
@@ -2199,15 +2285,102 @@
             if (upscaleLoading.value) return upscaleProgressLabel.value;
             return "";
           });
-          const isGenerateDisabled = computed(
-            () => loading.value || modelLoading.value || !!modelError.value || batchRunning.value
+          const modelName = (modelId) => {
+            const model = modelOptions.value.find((item) => item.id === modelId);
+            return model ? t(model.labelKey) : modelId;
+          };
+          const modelStatusLabel = computed(() => {
+            if (modelError.value) return `${t('status.loadFailed')}: ${modelError.value}`;
+            if (modelLoading.value) return t('model.loading');
+            if (activeModelId.value) return `${t('model.active')}: ${modelName(activeModelId.value)}`;
+            return t('model.none');
+          });
+          const selectedModelAvailable = computed(() => {
+            const model = modelOptions.value.find((item) => item.id === selectedModelId.value);
+            return model?.available !== false;
+          });
+          const isModelLoadDisabled = computed(
+            () => modelLoading.value || loading.value || batchRunning.value || upscaleLoading.value || !selectedModelAvailable.value
           );
+          const isGenerateDisabled = computed(
+            () => loading.value || modelLoading.value || !!modelError.value || batchRunning.value || !activeModelId.value
+          );
+
+          const applyModelDefaults = (defaults) => {
+            if (!defaults || typeof defaults !== "object") return;
+            if (Number.isFinite(Number(defaults.steps))) {
+              steps.value = Math.max(4, Math.min(50, Number(defaults.steps)));
+            }
+            if (Number.isFinite(Number(defaults.guidance))) {
+              guidance.value = Math.max(0, Math.min(10, Number(defaults.guidance)));
+            }
+          };
+
+          const syncActiveModel = (modelId) => {
+            activeModelId.value = modelId || null;
+            activeModelDefaults.value = activeModelId.value
+              ? modelOptions.value.find((item) => item.id === activeModelId.value)?.defaults || null
+              : null;
+          };
+
+          const fetchModels = async ({ force = false } = {}) => {
+            const requestGeneration = modelStateGeneration;
+            try {
+              const res = await fetch("/models");
+              if (!res.ok) throw new Error(t('model.fetchFailed'));
+              const data = await res.json();
+              if (requestGeneration !== modelStateGeneration || (!force && modelLoadPending.value)) return false;
+              const catalog = Array.isArray(data.models) ? data.models : [];
+              modelOptions.value = modelOptions.value.map((option) => {
+                const model = catalog.find((item) => item.id === option.id);
+                return model ? { ...option, available: model.available !== false, defaults: model.defaults || null } : option;
+              });
+              syncActiveModel(data.active_model);
+              serverModelLoading.value = !!data.loading;
+              modelError.value = data.last_error || "";
+              return true;
+            } catch (err) {
+              if (requestGeneration === modelStateGeneration && (force || !modelLoadPending.value)) {
+                modelError.value = err.message || t('model.fetchFailed');
+              }
+              return false;
+            }
+          };
+
+          const loadSelectedModel = async () => {
+            if (isModelLoadDisabled.value) return;
+            const loadGeneration = ++modelStateGeneration;
+            modelLoadPending.value = true;
+            modelError.value = "";
+            try {
+              const res = await fetch("/models/load", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ model: selectedModelId.value }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(data.error || t('status.loadFailed'));
+              if (loadGeneration !== modelStateGeneration) return;
+              syncActiveModel(data.active_model);
+              activeModelDefaults.value = data.defaults || null;
+              serverModelLoading.value = false;
+              applyModelDefaults(data.defaults);
+            } catch (err) {
+              if (loadGeneration === modelStateGeneration) {
+                await fetchModels({ force: true });
+                modelError.value = err.message || t('status.loadFailed');
+              }
+            } finally {
+              modelStateGeneration += 1;
+              modelLoadPending.value = false;
+            }
+          };
 
           const resetPrompt = () => {
             prompt.value = DEFAULT_PROMPT;
             negativePrompt.value = "";
-            guidance.value = 0;
-            steps.value = 9;
+            guidance.value = activeModelDefaults.value?.guidance ?? 0;
+            steps.value = activeModelDefaults.value?.steps ?? 9;
             height.value = 512;
             width.value = 512;
             seed.value = "";
@@ -2405,6 +2578,7 @@
           };
 
           onMounted(() => {
+            fetchModels();
             const pick = presets[Math.floor(Math.random() * presets.length)];
             if (pick) {
               prompt.value = pick;
@@ -2941,12 +3115,16 @@
             if (loading.value || batchRunning.value) {
               return false;
             }
+            if (!activeModelId.value) {
+              error.value = t('model.none');
+              return false;
+            }
             if (modelLoading.value) {
               error.value = t('status.loading');
               return false;
             }
             if (modelError.value) {
-              error.value = `模型加载失败: ${modelError.value}`;
+              error.value = `${t('model.loadFailed')}: ${modelError.value}`;
               return false;
             }
 
@@ -3043,26 +3221,35 @@
           };
 
           const checkHealth = async () => {
+            const requestGeneration = modelStateGeneration;
             try {
               const res = await fetch("/health");
               if (!res.ok) throw new Error();
               const data = await res.json();
-              if (data.pipeline_error) {
-                modelError.value = data.pipeline_error;
-                modelLoading.value = false;
-                return;
-              }
-              if (data.pipeline_ready) {
-                modelLoading.value = false;
-                return;
+              if (requestGeneration !== modelStateGeneration) return;
+              serverModelLoading.value = !!data.model_loading;
+              if (!modelLoadPending.value) {
+                syncActiveModel(data.active_model);
+                if (data.pipeline_error) {
+                  modelError.value = data.pipeline_error;
+                } else if (data.pipeline_ready) {
+                  modelError.value = "";
+                }
               }
             } catch (err) {
               // swallow errors; will retry
+            } finally {
+              healthPollTimer = setTimeout(checkHealth, 1200);
             }
-            setTimeout(checkHealth, 1200);
           };
 
           checkHealth();
+          onBeforeUnmount(() => {
+            if (healthPollTimer) {
+              clearTimeout(healthPollTimer);
+              healthPollTimer = null;
+            }
+          });
 
           return {
             prompt,
@@ -3077,6 +3264,12 @@
             loading,
             modelLoading,
             modelError,
+            modelOptions,
+            selectedModelId,
+            activeModelId,
+            modelStatusLabel,
+            isModelLoadDisabled,
+            loadSelectedModel,
             statusLabel,
             statusTone,
             error,

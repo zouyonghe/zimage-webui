@@ -20,12 +20,14 @@ zimage_test.png
 
 # Large model/weight directories
 zimage-model/
+zimage-base-model/
 weights/
 text_encoder/
 transformer/
 vae/
 
 # Misc
+docs/plans/
 .idea/
 .vscode/
 scripts/concurrent_generate_test.py

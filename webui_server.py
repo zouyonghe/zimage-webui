@@ -1,10 +1,14 @@
 import base64
+import gc
 import io
 import json
+import math
 import os
 import re
 import signal
+import socket
 import sys
+import time
 import contextlib
 import inspect
 import uuid
@@ -47,10 +51,23 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 ROOT = Path(__file__).parent
 WEB_DIR = ROOT / "webui"
+MODEL_REGISTRY = {
+    "turbo": {
+        "display_name": "Z-Image Turbo",
+        "path": ROOT / "zimage-model",
+        "defaults": {"steps": 9, "guidance": 0.0, "cfg_normalization": False},
+    },
+    "base": {
+        "display_name": "Z-Image Base",
+        "path": ROOT / "zimage-base-model",
+        "defaults": {"steps": 50, "guidance": 4.0, "cfg_normalization": False},
+    },
+}
+REQUIRED_MODEL_PATHS = ("model_index.json", "text_encoder", "tokenizer", "transformer", "vae")
 DEFAULT_PROMPT = "a cat sitting on a chair, high quality, detailed"
 DEFAULT_HEIGHT = 512
 DEFAULT_WIDTH = 512
-HOST = "0.0.0.0"
+HOST = os.environ.get("ZIMAGE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("ZIMAGE_PORT", 9000))
 CPU_OFFLOAD = os.environ.get("ZIMAGE_CPU_OFFLOAD", "").lower() in {"1", "true", "yes", "on"}
 MAX_RESOLUTION = 1024
@@ -67,6 +84,7 @@ UPSCALE_TILE = int(os.environ.get("ZIMAGE_UPSCALE_TILE", 256))
 UPSCALE_TILE_PAD = int(os.environ.get("ZIMAGE_UPSCALE_TILE_PAD", 10))
 UPSCALE_MAX_CONCURRENCY = int(os.environ.get("ZIMAGE_UPSCALE_CONCURRENCY", 1))
 UPSCALE_WAIT_TIMEOUT = int(os.environ.get("ZIMAGE_UPSCALE_WAIT_TIMEOUT", 60))  # seconds
+SSE_WRITE_TIMEOUT = float(os.environ.get("ZIMAGE_SSE_WRITE_TIMEOUT", 5.0))
 UPSCALE_DEFAULT_FORMAT = os.environ.get("ZIMAGE_UPSCALE_FORMAT", "png").lower()
 
 
@@ -100,10 +118,11 @@ def generation_context(device: str, dtype: torch.dtype):
 _PIPE = None
 _DEVICE = None
 _DTYPE = None
-_PIPE_LOCK = Lock()
-_GEN_LOCK = Lock()
-_WARMING = False
+_ACTIVE_MODEL_ID = None
+_MODEL_LOADING = False
 _PIPE_ERROR = None
+_RUNTIME_LOCK = Lock()
+_STATE_LOCK = Lock()
 _UPSCALER = None
 _UPSCALER_LOCK = Lock()
 _UPSCALER_ERROR = None
@@ -133,27 +152,123 @@ def _save_image_async(image: Image.Image, path: Path, *, fmt: str = "png", compr
     Thread(target=_worker, daemon=True).start()
 
 
-def get_pipeline():
-    global _PIPE, _DEVICE, _DTYPE, _PIPE_ERROR  # noqa: PLW0603
+class UnknownModelError(ValueError):
+    pass
 
-    if _PIPE is not None:
-        return _PIPE, _DEVICE, _DTYPE
 
-    with _PIPE_LOCK:
-        if _PIPE is not None:
-            return _PIPE, _DEVICE, _DTYPE
+class ModelUnavailableError(RuntimeError):
+    pass
 
-        if not torch.cuda.is_available():
-            _PIPE_ERROR = "CUDA unavailable"
-            raise RuntimeError("CUDA unavailable")
 
-        device = "cuda"
-        dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+class RuntimeBusyError(RuntimeError):
+    pass
 
-        print("Loading Z-Image-Turbo from local weights...")
+
+class NoActiveModelError(RuntimeError):
+    pass
+
+
+def _missing_model_paths(model_path: Path) -> list[str]:
+    missing = []
+    for relative_path in REQUIRED_MODEL_PATHS:
+        path = model_path / relative_path
+        exists = path.is_file() if relative_path == "model_index.json" else path.is_dir()
+        if not exists:
+            missing.append(relative_path)
+    return missing
+
+
+def _runtime_state_snapshot() -> tuple:
+    with _STATE_LOCK:
+        return _ACTIVE_MODEL_ID, _MODEL_LOADING, _PIPE_ERROR, _DEVICE, _DTYPE
+
+
+def _publish_runtime_state(*, active_model=None, loading=False, error=None, device=None, dtype=None) -> None:
+    global _ACTIVE_MODEL_ID, _MODEL_LOADING, _PIPE_ERROR, _DEVICE, _DTYPE  # noqa: PLW0603
+
+    with _STATE_LOCK:
+        _ACTIVE_MODEL_ID = active_model
+        _MODEL_LOADING = loading
+        _PIPE_ERROR = error
+        _DEVICE = device
+        _DTYPE = dtype
+
+
+def _set_runtime_loading(loading: bool) -> None:
+    global _MODEL_LOADING  # noqa: PLW0603
+
+    with _STATE_LOCK:
+        _MODEL_LOADING = loading
+
+
+def get_models_status() -> dict:
+    active_model, loading, error, _device, _dtype = _runtime_state_snapshot()
+    models = []
+    for model_id, config in MODEL_REGISTRY.items():
+        missing = _missing_model_paths(config["path"])
+        models.append(
+            {
+                "id": model_id,
+                "display_name": config["display_name"],
+                "path": str(config["path"]),
+                "available": not missing,
+                "missing": missing,
+                "defaults": dict(config["defaults"]),
+            }
+        )
+    return {
+        "models": models,
+        "active_model": active_model,
+        "loading": loading,
+        "last_error": error,
+    }
+
+
+def get_active_pipeline():
+    if _PIPE is None or _ACTIVE_MODEL_ID is None:
+        raise NoActiveModelError("No model is active; load a model first")
+    return _PIPE, _DEVICE, _DTYPE, MODEL_REGISTRY[_ACTIVE_MODEL_ID]
+
+
+def _unload_active_pipeline(*, loading=False) -> None:
+    global _PIPE  # noqa: PLW0603
+
+    old_pipeline = _PIPE
+    _PIPE = None
+    _publish_runtime_state(loading=loading)
+    if old_pipeline is not None:
+        del old_pipeline
+    gc.collect()
+    torch.cuda.empty_cache()
+
+
+def load_model(model_id: str) -> dict:
+    global _PIPE  # noqa: PLW0603
+
+    if not isinstance(model_id, str) or model_id not in MODEL_REGISTRY:
+        raise UnknownModelError(f"Unknown model: {model_id}")
+
+    if not _RUNTIME_LOCK.acquire(blocking=False):
+        raise RuntimeBusyError("Runtime is busy")
+
+    _set_runtime_loading(True)
+    try:
+        config = MODEL_REGISTRY[model_id]
+        missing = _missing_model_paths(config["path"])
+        if missing:
+            raise ModelUnavailableError(f"Model '{model_id}' is incomplete; missing: {', '.join(missing)}")
+
+        pipe = None
         try:
+            _unload_active_pipeline(loading=True)
+            if not torch.cuda.is_available():
+                raise RuntimeError("CUDA unavailable")
+
+            device = "cuda"
+            dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+            print(f"Loading {config['display_name']} from local weights...")
             pipe = ZImagePipeline.from_pretrained(
-                str(ROOT / "zimage-model"),
+                str(config["path"]),
                 torch_dtype=dtype,
                 local_files_only=True,
             )
@@ -162,43 +277,29 @@ def get_pipeline():
                 print("Enabled model CPU offload.")
             else:
                 pipe = pipe.to(device)
+
+            try:
+                pipe.enable_xformers_memory_efficient_attention()
+                print("Enabled xformers memory efficient attention.")
+            except Exception as exc:  # noqa: BLE001
+                print("xformers not available:", exc)
+
+            pipe.enable_attention_slicing()
+            _PIPE = pipe
+            _publish_runtime_state(active_model=model_id, device=device, dtype=dtype)
+            print(f"Pipeline ready on {device} with dtype={dtype}.")
+            return {"active_model": model_id, "defaults": dict(config["defaults"])}
         except Exception as exc:  # noqa: BLE001
-            _PIPE_ERROR = str(exc)
+            _PIPE = None
+            _publish_runtime_state(error=str(exc))
+            if pipe is not None:
+                del pipe
+            gc.collect()
+            torch.cuda.empty_cache()
             raise
-
-        # xformers：显存 -20～40%
-        try:
-            pipe.enable_xformers_memory_efficient_attention()
-            print("Enabled xformers memory efficient attention.")
-        except Exception as exc:  # noqa: BLE001
-            print("xformers not available:", exc)
-
-        pipe.enable_attention_slicing()
-        print(f"Pipeline ready on {device} with dtype={dtype}.")
-
-        _PIPE, _DEVICE, _DTYPE = pipe, device, dtype
-        _PIPE_ERROR = None
-        return _PIPE, _DEVICE, _DTYPE
-
-
-def warmup_pipeline_async():
-    global _WARMING  # noqa: PLW0603
-
-    if _PIPE is not None or _WARMING:
-        return
-
-    _WARMING = True
-
-    def _load():
-        try:
-            get_pipeline()
-            print("Pipeline preloaded.")
-        except Exception as exc:  # noqa: BLE001
-            print(f"Pipeline preload failed: {exc}")
-        finally:
-            _WARMING = False
-
-    Thread(target=_load, daemon=True).start()
+    finally:
+        _set_runtime_loading(False)
+        _RUNTIME_LOCK.release()
 
 
 def get_upscaler():
@@ -333,12 +434,12 @@ class WebUIHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def _parse_generate_params(self, payload: dict) -> dict:
+    def _parse_generate_params(self, payload: dict, defaults: dict) -> dict:
         try:
             prompt = (payload.get("prompt") or "").strip() or DEFAULT_PROMPT
             negative_prompt = (payload.get("negative_prompt") or "").strip()
-            steps = int(payload.get("steps", 9))
-            guidance = float(payload.get("guidance", 0.0))
+            steps = int(payload.get("steps", defaults["steps"]))
+            guidance = float(payload.get("guidance", defaults["guidance"]))
             height = int(payload.get("height", DEFAULT_HEIGHT))
             width = int(payload.get("width", DEFAULT_WIDTH))
             seed = payload.get("seed")
@@ -354,6 +455,8 @@ class WebUIHandler(SimpleHTTPRequestHandler):
 
         if guidance < MIN_GUIDANCE or guidance > MAX_GUIDANCE:
             raise ValueError(f"guidance must be between {MIN_GUIDANCE} and {MAX_GUIDANCE}")
+        if not math.isfinite(guidance):
+            raise ValueError("guidance must be finite")
 
         return {
             "prompt": prompt,
@@ -368,45 +471,63 @@ class WebUIHandler(SimpleHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         path = urlparse(self.path).path.rstrip("/") or "/"
 
+        if path == "/models":
+            self._send_json(200, get_models_status())
+            return
+
         if path == "/health":
+            active_model, loading, error, _device, _dtype = _runtime_state_snapshot()
             self._send_json(
                 200,
                 {
                     "status": "ok",
                     "cuda_available": torch.cuda.is_available(),
-                    "pipeline_loaded": _PIPE is not None,
-                    "pipeline_error": _PIPE_ERROR,
-                    "pipeline_ready": (_PIPE is not None) and (_PIPE_ERROR is None),
+                    "pipeline_loaded": active_model is not None,
+                    "pipeline_error": error,
+                    "pipeline_ready": active_model is not None,
+                    "active_model": active_model,
+                    "model_loading": loading,
+                    "model_error": error,
                 },
             )
             return
 
         if path == "/info":
-            device = _DEVICE or ("cuda" if torch.cuda.is_available() else "cpu")
-            dtype = str(_DTYPE) if _DTYPE else ("torch.bfloat16" if device == "cuda" else "torch.float32")
+            active_model, loading, error, device, dtype = _runtime_state_snapshot()
+            model_config = MODEL_REGISTRY.get(active_model)
+            defaults = None
+            if model_config is not None:
+                defaults = {
+                    "prompt": DEFAULT_PROMPT,
+                    **model_config["defaults"],
+                    "height": DEFAULT_HEIGHT,
+                    "width": DEFAULT_WIDTH,
+                }
             self._send_json(
                 200,
                 {
-                    "model": "ZImagePipeline",
-                    "device": device,
-                    "dtype": dtype,
-                    "defaults": {
-                        "prompt": DEFAULT_PROMPT,
-                        "steps": 9,
-                        "guidance": 0.0,
-                        "height": 512,
-                        "width": 512,
-                    },
+                    "model": model_config["display_name"] if model_config else None,
+                    "active_model": active_model,
+                    "model_loading": loading,
+                    "model_error": error,
+                    "device": device if model_config else None,
+                    "dtype": str(dtype) if model_config else None,
+                    "defaults": defaults,
                 },
             )
             return
 
         if path == "/warmup":
-            try:
-                pipe, device, dtype = get_pipeline()
-                self._send_json(200, {"status": "ready", "device": device, "dtype": str(dtype)})
-            except Exception as exc:  # noqa: BLE001
-                self._send_json(500, {"error": f"Warmup failed: {exc}"})
+            with _RUNTIME_LOCK:
+                try:
+                    _, device, dtype, _ = get_active_pipeline()
+                except NoActiveModelError as exc:
+                    self._send_json(409, {"error": str(exc)})
+                    return
+                self._send_json(
+                    200,
+                    {"status": "ready", "active_model": _runtime_state_snapshot()[0], "device": device, "dtype": str(dtype)},
+                )
             return
 
         super().do_GET()
@@ -421,6 +542,23 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             self._send_json(400, {"error": f"Invalid request body: {exc}"})
             return
 
+        if not isinstance(payload, dict):
+            self._send_json(400, {"error": "Invalid request body: expected a JSON object"})
+            return
+
+        if path == "/models/load":
+            try:
+                result = load_model(payload.get("model"))
+            except UnknownModelError as exc:
+                self._send_json(400, {"error": str(exc)})
+            except (ModelUnavailableError, RuntimeBusyError) as exc:
+                self._send_json(409, {"error": str(exc)})
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(500, {"error": f"Model load failed: {exc}"})
+            else:
+                self._send_json(200, result)
+            return
+
         if path == "/upscale_stream":
             return self._handle_upscale_stream(payload)
         if path == "/upscale":
@@ -431,30 +569,30 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             self.send_error(404, "Unsupported endpoint")
             return
 
-        try:
-            params = self._parse_generate_params(payload)
-        except ValueError as exc:
-            self._send_json(400, {"error": str(exc)})
-            return
+        with _RUNTIME_LOCK:
+            try:
+                pipe, device, dtype, model_config = get_active_pipeline()
+            except NoActiveModelError as exc:
+                self._send_json(409, {"error": str(exc)})
+                return
 
-        try:
-            pipe, device, dtype = get_pipeline()
-        except Exception as exc:  # noqa: BLE001
-            self._send_json(500, {"error": f"Pipeline init failed: {exc}"})
-            return
+            try:
+                params = self._parse_generate_params(payload, model_config["defaults"])
+            except ValueError as exc:
+                self._send_json(400, {"error": str(exc)})
+                return
 
-        try:
-            generator, seed = build_generator(device, params["seed"])
-        except Exception as exc:  # noqa: BLE001
-            self._send_json(400, {"error": f"Invalid seed: {exc}"})
-            return
+            try:
+                generator, seed = build_generator(device, params["seed"])
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(400, {"error": f"Invalid seed: {exc}"})
+                return
 
-        print(
-            f"Generating image | prompt='{params['prompt']}' steps={params['steps']} guidance={params['guidance']} size={params['width']}x{params['height']} seed={seed} device={device}"
-        )
+            print(
+                f"Generating image | prompt='{params['prompt']}' steps={params['steps']} guidance={params['guidance']} size={params['width']}x{params['height']} seed={seed} device={device}"
+            )
 
-        try:
-            with _GEN_LOCK:
+            try:
                 with generation_context(device, dtype):
                     result = pipe(
                         params["prompt"],
@@ -464,11 +602,12 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                         width=params["width"],
                         negative_prompt=params["negative_prompt"] or None,
                         generator=generator,
+                        cfg_normalization=model_config["defaults"]["cfg_normalization"],
                     )
-            image = result.images[0]
-        except Exception as exc:  # noqa: BLE001
-            self._send_json(500, {"error": f"Generation failed: {exc}"})
-            return
+                image = result.images[0]
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(500, {"error": f"Generation failed: {exc}"})
+                return
 
         buffer = io.BytesIO()
         image.save(buffer, format="PNG")
@@ -521,6 +660,9 @@ class WebUIHandler(SimpleHTTPRequestHandler):
         if scale <= 0:
             self._send_json(400, {"error": "scale must be positive", "request_id": req_id})
             return
+        if not math.isfinite(scale):
+            self._send_json(400, {"error": "scale must be finite", "request_id": req_id})
+            return
 
         scale = max(1.0, min(scale, MAX_UPSCALE_FACTOR))
         out_fmt = _validate_image_format(out_format)
@@ -552,56 +694,47 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             return
 
         try:
-            upscaler, device = get_upscaler()
-        except Exception as exc:  # noqa: BLE001
-            _release_upscale_slot(slot_acquired)
-            self._send_json(500, {"error": f"Upscale unavailable: {exc}", "request_id": req_id})
-            return
-
-        max_edge = max(target_w, target_h)
-        tile, pad = _select_upscale_tile(max_edge)
-        upscaler.tile = tile
-        upscaler.tile_pad = pad
-        print(f"[UPSCALE] start req={req_id} size={src_w}x{src_h}->{target_w}x{target_h} scale={scale} fmt={out_fmt} tile={tile} pad={pad}")
-
-        try:
-            # RealESRGAN expects BGR numpy input; silence verbose tile logs
-            img_np = np.array(image)[:, :, ::-1]
-            with contextlib.redirect_stdout(io.StringIO()):
-                output, _ = upscaler.enhance(img_np, outscale=scale)
+            max_edge = max(target_w, target_h)
+            tile, pad = _select_upscale_tile(max_edge)
+            with _RUNTIME_LOCK:
+                upscaler, device = get_upscaler()
+                upscaler.tile = tile
+                upscaler.tile_pad = pad
+                print(f"[UPSCALE] start req={req_id} size={src_w}x{src_h}->{target_w}x{target_h} scale={scale} fmt={out_fmt} tile={tile} pad={pad}")
+                # RealESRGAN expects BGR numpy input; silence verbose tile logs
+                img_np = np.array(image)[:, :, ::-1]
+                with contextlib.redirect_stdout(io.StringIO()):
+                    output, _ = upscaler.enhance(img_np, outscale=scale)
             upscaled = Image.fromarray(output[:, :, ::-1])
-        except Exception as exc:  # noqa: BLE001
-            _release_upscale_slot(slot_acquired)
-            self._send_json(500, {"error": f"Upscale failed: {exc}", "request_id": req_id})
-            return
-
-        data_url, mime = _encode_image(upscaled, out_fmt)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        file_path = OUTPUT_DIR / f"{timestamp}_{target_w}x{target_h}.{out_fmt}"
-        _save_image_async(upscaled, file_path, fmt=out_fmt)
-
-        _release_upscale_slot(slot_acquired)
-
-        self._send_json(
-            200,
-            {
-                "image": data_url if return_image else None,
-                "meta": {
-                    "type": "upscale",
-                    "source_width": src_w,
-                    "source_height": src_h,
-                    "width": target_w,
-                    "height": target_h,
-                    "applied_scale": scale,
-                    "saved_path": str(file_path),
-                    "mime": mime,
-                    "request_id": req_id,
-                    "tile": tile,
+            data_url, mime = _encode_image(upscaled, out_fmt)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            file_path = OUTPUT_DIR / f"{timestamp}_{target_w}x{target_h}.{out_fmt}"
+            _save_image_async(upscaled, file_path, fmt=out_fmt)
+            self._send_json(
+                200,
+                {
+                    "image": data_url if return_image else None,
+                    "meta": {
+                        "type": "upscale",
+                        "source_width": src_w,
+                        "source_height": src_h,
+                        "width": target_w,
+                        "height": target_h,
+                        "applied_scale": scale,
+                        "saved_path": str(file_path),
+                        "mime": mime,
+                        "request_id": req_id,
+                        "tile": tile,
+                    },
                 },
-            },
-        )
+            )
+        except Exception as exc:  # noqa: BLE001
+            self._send_json(500, {"error": f"Upscale failed: {exc}", "request_id": req_id})
+        finally:
+            _release_upscale_slot(slot_acquired)
 
     def _handle_upscale_stream(self, payload: dict):
+        self._sse_disconnected = False
         req_id = _new_request_id()
         try:
             image_b64 = payload.get("image")
@@ -619,6 +752,9 @@ class WebUIHandler(SimpleHTTPRequestHandler):
 
         if scale <= 0:
             self._send_json(400, {"error": "scale must be positive", "request_id": req_id})
+            return
+        if not math.isfinite(scale):
+            self._send_json(400, {"error": "scale must be finite", "request_id": req_id})
             return
 
         scale = max(1.0, min(scale, MAX_UPSCALE_FACTOR))
@@ -659,31 +795,30 @@ class WebUIHandler(SimpleHTTPRequestHandler):
             return
 
         try:
-            upscaler, device = get_upscaler()
-        except Exception as exc:  # noqa: BLE001
+            self._finish_upscale_stream(
+                image=image,
+                src_w=src_w,
+                src_h=src_h,
+                target_w=target_w,
+                target_h=target_h,
+                scale=scale,
+                out_format=out_format,
+                return_image=return_image,
+                req_id=req_id,
+            )
+        finally:
             _release_upscale_slot(slot_acquired)
-            self._send_sse_event("error", {"message": f"Upscale unavailable: {exc}", "request_id": req_id})
-            return
 
-        def send_error(message: str):
-            try:
-                self._send_sse_event("error", {"message": message, "request_id": req_id})
-            except BrokenPipeError:
-                return
-
+    def _finish_upscale_stream(self, *, image, src_w, src_h, target_w, target_h, scale, out_format, return_image, req_id):
         def send_progress(current: int, total: int):
-            try:
-                self._send_sse_event("progress", {"current": current, "total": total, "request_id": req_id})
-            except BrokenPipeError:
-                raise
+            self._send_sse_event("progress", {"current": current, "total": total, "request_id": req_id})
 
         class _TileProgressWriter:
             def __init__(self, emitter):
                 self.buffer = ""
                 self.emit = emitter
 
-            def write(self, data):  # noqa: D401
-                """Collect stdout/stderr from RealESRGAN and emit tile progress events."""
+            def write(self, data):
                 text = str(data).replace("\r", "\n")
                 self.buffer += text
                 while "\n" in self.buffer:
@@ -695,49 +830,29 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                 if self.buffer:
                     self._handle_line(self.buffer.strip())
                     self.buffer = ""
-                return
 
             def _handle_line(self, line: str):
-                if not line:
-                    return
-                m = re.search(r"Tile\s+(\d+)/(\d+)", line, re.IGNORECASE)
-                if m:
-                    try:
-                        current = int(m.group(1))
-                        total = int(m.group(2))
-                        self.emit(current, total)
-                    except Exception:
-                        return
+                match = re.search(r"Tile\s+(\d+)/(\d+)", line, re.IGNORECASE)
+                if match:
+                    self.emit(int(match.group(1)), int(match.group(2)))
 
-        max_edge = max(target_w, target_h)
-        tile, pad = _select_upscale_tile(max_edge)
-        upscaler.tile = tile
-        upscaler.tile_pad = pad
-
+        tile, pad = _select_upscale_tile(max(target_w, target_h))
         out_fmt = _validate_image_format(out_format)
-        print(f"[UPSCALE_STREAM] start req={req_id} size={src_w}x{src_h}->{target_w}x{target_h} scale={scale} fmt={out_fmt} tile={tile} pad={pad}")
-
         try:
-            writer = _TileProgressWriter(send_progress)
-            with contextlib.redirect_stdout(writer), contextlib.redirect_stderr(writer):
-                img_np = np.array(image)[:, :, ::-1]
-                output, _ = upscaler.enhance(img_np, outscale=scale)
+            with _RUNTIME_LOCK:
+                upscaler, device = get_upscaler()
+                upscaler.tile = tile
+                upscaler.tile_pad = pad
+                print(f"[UPSCALE_STREAM] start req={req_id} size={src_w}x{src_h}->{target_w}x{target_h} scale={scale} fmt={out_fmt} tile={tile} pad={pad}")
+                writer = _TileProgressWriter(send_progress)
+                with contextlib.redirect_stdout(writer), contextlib.redirect_stderr(writer):
+                    img_np = np.array(image)[:, :, ::-1]
+                    output, _ = upscaler.enhance(img_np, outscale=scale)
             upscaled = Image.fromarray(output[:, :, ::-1])
             data_url, mime = _encode_image(upscaled, out_fmt)
-        except BrokenPipeError:
-            _release_upscale_slot(slot_acquired)
-            return
-        except Exception as exc:  # noqa: BLE001
-            _release_upscale_slot(slot_acquired)
-            send_error(f"Upscale failed: {exc}")
-            return
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        out_fmt = _validate_image_format(out_format)
-        file_path = OUTPUT_DIR / f"{timestamp}_{target_w}x{target_h}.{out_fmt}"
-        _save_image_async(upscaled, file_path, fmt=out_fmt)
-
-        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            file_path = OUTPUT_DIR / f"{timestamp}_{target_w}x{target_h}.{out_fmt}"
+            _save_image_async(upscaled, file_path, fmt=out_fmt)
             self._send_sse_event(
                 "result",
                 {
@@ -757,10 +872,9 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                 },
             )
             self._send_sse_event("done", {"ok": True, "request_id": req_id})
-        except BrokenPipeError:
-            return
-        finally:
-            _release_upscale_slot(slot_acquired)
+        except Exception as exc:  # noqa: BLE001
+            self._send_sse_event("error", {"message": f"Upscale failed: {exc}", "request_id": req_id})
+
     def log_message(self, fmt, *args):  # noqa: D401,N802
         """Silence noisy health polling logs."""
         if getattr(self, "path", "").startswith("/health"):
@@ -769,51 +883,64 @@ class WebUIHandler(SimpleHTTPRequestHandler):
 
     # ==== Streaming generation with progress ====
     def _send_sse_event(self, event: str, data: dict) -> bool:
+        if getattr(self, "_sse_disconnected", False):
+            return False
+        connection = getattr(self, "connection", None)
+        previous_timeout = connection.gettimeout() if connection is not None else None
         try:
+            if connection is not None:
+                connection.settimeout(SSE_WRITE_TIMEOUT)
             message = f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
             self.wfile.write(message.encode("utf-8"))
             self.wfile.flush()
             return True
-        except BrokenPipeError:
+        except (BrokenPipeError, socket.timeout, TimeoutError):
+            self._sse_disconnected = True
             return False
         except Exception as exc:  # noqa: BLE001
+            self._sse_disconnected = True
             print(f"SSE send error: {exc}")
             return False
+        finally:
+            if connection is not None:
+                try:
+                    connection.settimeout(previous_timeout)
+                except OSError:
+                    pass
 
     def _handle_generate_stream(self, payload: dict):
-        try:
-            params = self._parse_generate_params(payload)
-        except ValueError as exc:
-            self._send_json(400, {"error": str(exc)})
-            return
+        self._sse_disconnected = False
+        with _RUNTIME_LOCK:
+            try:
+                pipe, device, dtype, model_config = get_active_pipeline()
+            except NoActiveModelError as exc:
+                self._send_json(409, {"error": str(exc)})
+                return
 
-        try:
-            pipe, device, dtype = get_pipeline()
-        except Exception as exc:  # noqa: BLE001
-            self._send_json(500, {"error": f"Pipeline init failed: {exc}"})
-            return
+            try:
+                params = self._parse_generate_params(payload, model_config["defaults"])
+            except ValueError as exc:
+                self._send_json(400, {"error": str(exc)})
+                return
 
-        try:
-            generator, seed = build_generator(device, params["seed"])
-        except Exception as exc:  # noqa: BLE001
-            self._send_json(400, {"error": f"Invalid seed: {exc}"})
-            return
+            try:
+                generator, seed = build_generator(device, params["seed"])
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(400, {"error": f"Invalid seed: {exc}"})
+                return
 
-        # Prepare streaming headers
-        self.send_response(200)
-        self.send_header("Content-Type", "text/event-stream")
-        self.send_header("Cache-Control", "no-cache")
-        self.send_header("Connection", "keep-alive")
-        self.end_headers()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.end_headers()
 
-        print("[SSE] start /generate_stream", {'seed': seed, 'size': f"{params['width']}x{params['height']}"})
+            print("[SSE] start /generate_stream", {'seed': seed, 'size': f"{params['width']}x{params['height']}"})
+            print(
+                f"[SSE] Generating image | prompt='{params['prompt']}' steps={params['steps']} guidance={params['guidance']} size={params['width']}x{params['height']} seed={seed} device={device}"
+            )
 
-        print(
-            f"[SSE] Generating image | prompt='{params['prompt']}' steps={params['steps']} guidance={params['guidance']} size={params['width']}x{params['height']} seed={seed} device={device}"
-        )
-
-        try:
-            with _GEN_LOCK:
+            try:
                 # Check if pipeline supports callback; fallback to no per-step progress if not.
                 pipe_signature = inspect.signature(pipe.__call__)
                 supports_callback = "callback" in pipe_signature.parameters
@@ -826,7 +953,7 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                         {"step": step + 1, "total_steps": params["steps"]},
                     )
                     if not ok:
-                        raise BrokenPipeError()
+                        return
 
                 with generation_context(device, dtype):
                     kwargs = dict(
@@ -837,6 +964,7 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                         width=params["width"],
                         negative_prompt=params["negative_prompt"] or None,
                         generator=generator,
+                        cfg_normalization=model_config["defaults"]["cfg_normalization"],
                     )
                     if supports_callback:
                         kwargs["callback"] = progress_callback
@@ -846,13 +974,13 @@ class WebUIHandler(SimpleHTTPRequestHandler):
                         # Emit a start progress event to indicate fallback mode
                         self._send_sse_event("progress", {"step": 0, "total_steps": params["steps"], "note": "no_callback"})
                     result = pipe(**kwargs)
-            image = result.images[0]
-        except BrokenPipeError:
-            print("[SSE] Client disconnected during generation.")
-            return
-        except Exception as exc:  # noqa: BLE001
-            self._send_sse_event("error", {"error": f"Generation failed: {exc}"})
-            return
+                image = result.images[0]
+            except BrokenPipeError:
+                print("[SSE] Client disconnected during generation.")
+                return
+            except Exception as exc:  # noqa: BLE001
+                self._send_sse_event("error", {"error": f"Generation failed: {exc}"})
+                return
 
         buffer = io.BytesIO()
         image.save(buffer, format="PNG")
@@ -891,12 +1019,10 @@ def run_server():
         print(f"Static directory not found: {WEB_DIR}")
         return
 
-    warmup_pipeline_async()
-
     server = ThreadingHTTPServer((HOST, PORT), WebUIHandler)
     server.daemon_threads = True  # allow Ctrl+C to exit even if requests are running
     print(f"Serving WebUI on http://{HOST}:{PORT}")
-    print("模型在后台预加载中，WebUI 已立即可用。")
+    print("No model loaded. Choose a model through the WebUI before generating.")
     print("Press Ctrl+C to stop.")
     should_stop = False
 

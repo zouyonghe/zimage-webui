@@ -57,16 +57,18 @@ Z-Image WebUIはローカルAIモデルベースの軽量画像生成インタ�
 
 4. **モデル重みをダウンロード**
    ```bash
-   cd scripts && bash download_models.sh && cd ..
+   hf download Tongyi-MAI/Z-Image-Turbo --local-dir ./zimage-model
+   hf download Tongyi-MAI/Z-Image --local-dir ./zimage-base-model
    ```
+   ダウンロードに失敗する場合は `HF_ENDPOINT=https://hf-mirror.com` と `HF_HUB_DISABLE_XET=1` を設定してください。
 
 ### サービス起動
 
 ```bash
-python webui_server.py
+ZIMAGE_CPU_OFFLOAD=1 python webui_server.py
 ```
 
-サービスはデフォルトで `http://localhost:9000` で実行されます。環境変数 `ZIMAGE_PORT` でポートを変更できます。
+サービスはデフォルトで `http://localhost:9000` で実行されます。環境変数 `ZIMAGE_PORT` でポートを変更できます。起動時はモデルを自動ロードしないため、WebUI でモデルを選択して読み込んでください。
 
 ### コマンドライン使用
 
@@ -76,6 +78,9 @@ python zimage.py
 
 # カスタムプロンプトを使用
 python zimage.py "美しい山岳風景"
+
+# Base モデルを使用
+python zimage.py --model base "美しい山岳風景"
 ```
 
 ## 📁 プロジェクト構造
@@ -88,6 +93,7 @@ zimage-webui/
 ├── webui_server.py          # WebサーバーとAPI
 ├── zimage.py               # コマンドラインツール
 ├── zimage-model/           # AIモデル重みディレクトリ
+├── zimage-base-model/      # Z-Image Base 重みディレクトリ
 ├── weights/                # アップスケーリングモデル重み
 ├── outputs/                # 生成結果保存ディレクトリ
 ├── scripts/                # ヘルパースクリプト
